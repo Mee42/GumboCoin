@@ -7,6 +7,9 @@ class BlockChain{
     public val transactions :List<Transaction>
         get() = blocks.flatMap { it.transactions.list }
 
+    public val totalCoins :Int
+        get() = -1 * users().getValue("server")
+
     private val blocks = mutableListOf(
         Block(
             Transactions(emptyList()),

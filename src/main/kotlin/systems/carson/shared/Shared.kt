@@ -53,6 +53,21 @@ fun <T> Optional<T>.ifNotPresent(var1: () -> Unit) {
     }
 
 }
+
+
+data class GenericStreamBlob(
+    val usersUpdated :List<UserBlob> = emptyList(),
+    val transactionsPassed :List<Transaction> = emptyList(),
+    val totalCoins :Int)
+
+data class UserBlob(
+    val id :String,
+    val blocksOwned :Int,
+    val coins :Int,
+    val minerOnline :Boolean)
+
+
+
 enum class Const(val string :String, val equal :Boolean = true/*Opposite of equal is startsWith*/){
     BLOCK_ADDED_SUCCESS("Block has been added successfully"),
     BLOCK_ADD_FAILED("Error adding block", equal = false), ;
@@ -71,11 +86,12 @@ enum class RequestString(val string :String){
     LATEST_BLOCK("latest-block"),
     PING("ping"),
     BLOCK("block"),
-    SPECS("specs"),
+    GENERIC_STREAM("generic-stream"),
     LATEST_TRANSACTIONS("transactions"),
     USER_AMOUNT("user-amount"),
     BLOCKCHAIN_PRETTY("blockchain-pretty"),
-    USERS("users");
+    USERS("users"),
+    AUTH("auth");
 }
 
 /*

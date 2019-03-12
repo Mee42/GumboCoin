@@ -4,20 +4,14 @@ import io.rsocket.*
 import io.rsocket.transport.netty.server.TcpServerTransport
 import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.DirectProcessor
-import reactor.core.publisher.Flux
 import reactor.core.publisher.toFlux
 import systems.carson.shared.*
-import java.io.File
-import java.time.Duration
-import java.io.FileWriter
-import java.io.BufferedWriter
-import java.math.BigInteger
 import java.util.*
 
 
-//fun main() {
-//    startServer()
-//}
+fun main() {
+    startServer()
+}
 
 val blockchain = BlockChain()
 
@@ -31,13 +25,15 @@ val transactionFlux: DirectProcessor<Transactions> = DirectProcessor.create<Tran
 
 val random = Random()
 
+
+val genericStream = DirectProcessor.create<GenericStreamBlob>()
+
+
 fun startServer() {
+    genericStream.doOnNext { println(it) }.subscribe()
 
-
-
-    RequestResponse[RequestString.PING] = {
-        println("got a ping from ${it.data.id}");payloadOf("pong")
-    }
+    /** actual processing */
+    RequestResponse[RequestString.PING] = { println("got a ping from ${it.data.id}");payloadOf("pong") }
 
     RequestResponse[RequestString.BLOCK] = r@{
         val block = gson.fromJson(it.data.data, Block::class.java)
@@ -58,10 +54,24 @@ fun startServer() {
         }
 
         val result = blockchain.addBlock(block)
-        if(!result.isPresent){
+        result.ifNotPresent {
             lastHashFlux.onNext(block)
             transactionCache = mutableListOf()
             transactionFlux.onNext(Transactions(transactionCache))
+        }
+        result.ifNotPresent {
+            val users = blockchain.users()
+            val changedUsers = users
+                .filter { name -> block.transactions.list.any { w -> w.from == name.key || w.to == name.key } }
+                .map { name: Map.Entry<String, Int> -> UserBlob(
+                    id = name.key,
+                    blocksOwned = blockchain.transactions.filter { w -> w.from == "server" && w.to == name.key }.count(),
+                    coins = users.getValue(name.key),
+                    minerOnline = false) }
+            genericStream.onNext(GenericStreamBlob(
+                usersUpdated = changedUsers,
+                transactionsPassed = block.transactions.list,
+                totalCoins = blockchain.totalCoins))
         }
         payloadOf(
             if(result.isPresent)
@@ -70,18 +80,22 @@ fun startServer() {
                 Const.BLOCK_ADDED_SUCCESS.string)
     }
 
-    RequestStream[RequestString.LATEST_BLOCK] = {lastHashFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
-    RequestResponse[RequestString.LATEST_BLOCK] = { payloadOf(gson.toJson(blockchain.last())) }
-
-    RequestResponse[RequestString.LATEST_TRANSACTIONS] = { payloadOf(gson.toJson(Transactions(transactionCache))) }
-    RequestStream[RequestString.LATEST_TRANSACTIONS] = { transactionFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
-
-
+    RequestResponse[RequestString.AUTH] = { payloadOf(if(it.data.data == "u:p")  "true" else "false") }
 
     /** get requests */
     RequestResponse[RequestString.USER_AMOUNT] = { payloadOf("" + (blockchain.users()[it.data.id] ?: 0)) }
     RequestResponse[RequestString.BLOCKCHAIN_PRETTY] = { payloadOf(pretty.toJson(blockchain)) }
     RequestResponse[RequestString.USERS] = { payloadOf(pretty.toJson(blockchain.users())) }
+    RequestResponse[RequestString.LATEST_BLOCK] = { payloadOf(gson.toJson(blockchain.last())) }
+    RequestResponse[RequestString.LATEST_TRANSACTIONS] = { payloadOf(gson.toJson(Transactions(transactionCache))) }
+
+    /** update streams */
+    RequestStream[RequestString.LATEST_BLOCK] = { lastHashFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
+    RequestStream[RequestString.GENERIC_STREAM] = { genericStream.toFlux().map { gson.toJson(it) }.map { payloadOf(it) }}
+    RequestStream[RequestString.LATEST_TRANSACTIONS] = { transactionFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
+
+
+
 
     RSocketFactory.receive()
         .acceptor(MasterHandler())
@@ -94,8 +108,3 @@ fun startServer() {
 
 }
 fun hash(s :String):String = DigestUtils.sha256Hex(s)
-
-fun main() {
-    val maxKeySize = javax.crypto.Cipher.getMaxAllowedKeyLength("AES")
-    println("Max Key Size for AES : $maxKeySize")
-}
