@@ -32,11 +32,11 @@ private val socket: RSocket = RSocketFactory.connect()
 
 fun main(args: Array<String>) {
     //start transfers and such
-    socket.requestStream(DataBlob(RequestString.GENERIC_STREAM.string).payload())
-        .map { it.dataUtf8 }
-        .map { gson.fromJson(it,GenericStreamBlob::class.java) }
-        .map { println(it) }
-        .blockLast()
+//    socket.requestStream(DataBlob(RequestString.GENERIC_STREAM.string).payload())
+//        .map { it.dataUtf8 }
+//        .map { gson.fromJson(it,GenericStreamBlob::class.java) }
+//        .map { println(it) }
+//        .subscribe()
 
     launch<ClientVisual>(args)
 }

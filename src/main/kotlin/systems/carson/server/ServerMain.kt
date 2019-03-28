@@ -29,6 +29,7 @@ val random = Random()
 val genericStream = DirectProcessor.create<GenericStreamBlob>()
 
 
+
 fun startServer() {
     genericStream.doOnNext { println(it) }.subscribe()
 
@@ -80,7 +81,9 @@ fun startServer() {
                 Const.BLOCK_ADDED_SUCCESS.string)
     }
 
-    RequestResponse[RequestString.AUTH] = { payloadOf(if(it.data.data == "u:p")  "true" else "false") }
+    RequestResponse[RequestString.AUTH] = {
+        payloadOf("true")
+    }
 
     /** get requests */
     RequestResponse[RequestString.USER_AMOUNT] = { payloadOf("" + (blockchain.users()[it.data.id] ?: 0)) }
@@ -93,8 +96,6 @@ fun startServer() {
     RequestStream[RequestString.LATEST_BLOCK] = { lastHashFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
     RequestStream[RequestString.GENERIC_STREAM] = { genericStream.toFlux().map { gson.toJson(it) }.map { payloadOf(it) }}
     RequestStream[RequestString.LATEST_TRANSACTIONS] = { transactionFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
-
-
 
 
     RSocketFactory.receive()
