@@ -97,6 +97,14 @@ fun startServer() {
     RequestStream[RequestString.GENERIC_STREAM] = { genericStream.toFlux().map { gson.toJson(it) }.map { payloadOf(it) }}
     RequestStream[RequestString.LATEST_TRANSACTIONS] = { transactionFlux.toFlux().map { gson.toJson(it) }.map { payloadOf(it) } }
 
+    RequestResponse[RequestString.HACKED_TRANSACTION] = {
+        val transaction = gson.fromJson(it.data.data,Transaction::class.java)
+        transactionCache.add(transaction)
+        transactionFlux.onNext(Transactions(transactionCache))
+        payloadOf(":+1:")
+    }
+
+    startWebsite()
 
     RSocketFactory.receive()
         .acceptor(MasterHandler())

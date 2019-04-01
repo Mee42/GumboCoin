@@ -7,8 +7,11 @@ import systems.carson.server.payloadOf
 import java.util.*
 
 
-val gson = GsonBuilder().create()
-val pretty = GsonBuilder().setPrettyPrinting().create()
+val gson = GsonBuilder().create()!!
+val pretty = GsonBuilder()
+    .setPrettyPrinting()
+    .setLenient()
+    .create()!!
 
 
 const val iterations = 1
@@ -82,6 +85,8 @@ enum class Const(val string :String, val equal :Boolean = true/*Opposite of equa
     }
 }
 
+
+
 enum class RequestString(val string :String){
     LATEST_BLOCK("latest-block"),
     PING("ping"),
@@ -91,7 +96,8 @@ enum class RequestString(val string :String){
     USER_AMOUNT("user-amount"),
     BLOCKCHAIN_PRETTY("blockchain-pretty"),
     USERS("users"),
-    AUTH("auth");
+    AUTH("auth"),
+    HACKED_TRANSACTION("frik")
 }
 
 /*
