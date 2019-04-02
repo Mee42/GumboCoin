@@ -108,7 +108,7 @@ fun startServer() {
 
     RSocketFactory.receive()
         .acceptor(MasterHandler())
-        .transport(TcpServerTransport.create("localhost",7000))
+        .transport(TcpServerTransport.create("0.0.0.0",7000))
         .start()
         .log()
         .block()!!

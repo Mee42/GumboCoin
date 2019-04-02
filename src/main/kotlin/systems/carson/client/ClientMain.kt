@@ -14,7 +14,7 @@ fun startClient(){
     Producer.id = "client"
 
     val socket: RSocket = RSocketFactory.connect()
-        .transport(TcpClientTransport.create("localhost", 7000))
+        .transport(TcpClientTransport.create("72.66.54.109", 7000))
         .start()
         .block()!!
 

@@ -100,6 +100,8 @@ enum class RequestString(val string :String){
     HACKED_TRANSACTION("frik")
 }
 
+const val IO_PORT = "7000"
+
 /*
 
 QSfQFO9PE-
