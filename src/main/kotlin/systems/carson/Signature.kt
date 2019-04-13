@@ -1,16 +1,20 @@
 package systems.carson
 
-import java.security.KeyPair
-import java.security.PublicKey
+class Signature(val byteArray: ByteArray) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
 
-class Signature(val byteArray: ByteArray)
+        other as Signature
 
+        if (!byteArray.contentEquals(other.byteArray)) return false
 
-class PublicPerson(name :String,private val publicKeyIn : PublicKey) :Person(name){
-    override val keyPair: KeyPair
-        get() = KeyPair(publicKeyIn,null)
+        return true
+    }
+
+    override fun hashCode(): Int {
+        return byteArray.contentHashCode()
+    }
 }
 
-class EncryptedData(val iv :ByteArray, val encryptedSecretKey :ByteArray,val encrypedData :ByteArray)
-
-
+class EncryptedData(val iv :ByteArray, val encryptedSecretKey :ByteArray,val encryptedData :ByteArray)
