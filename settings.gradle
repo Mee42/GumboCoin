@@ -1,2 +1,4 @@
-rootProject.name = 'gumbocoinv3'
-
+rootProject.name = 'gumbocoinv4'
+include 'base'
+include 'server'
+include 'website'
