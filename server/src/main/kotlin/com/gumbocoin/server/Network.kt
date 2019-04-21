@@ -16,15 +16,17 @@ import java.nio.charset.Charset
 //fun toPayload(string :String):Payload = DefaultPayload.create(string)
 fun String.toPayload():Payload = DefaultPayload.create(this)
 
-val people = mutableMapOf<String,Person>()
 
 fun isValid(message: Message):Boolean{
+    val people = blockchain.users.map { it.id to it.person }.toMap()
     if(!people.containsKey(message.clientID))
         return false
     val data = message.encryptedData.toBytes().concat()
     val sig = Signature.fromBase64(message.signature)
-    return Person.verify(people[message.clientID]!!,sig,data)
+    val person = people.getOrElse(message.clientID) { error("fuk") }
+    return Person.verify(person,sig,data)
 }
+
 
 operator fun <T1,T2> Tuple2<T1,T2>.component1():T1{
     return t1
@@ -49,7 +51,7 @@ private fun Mono<Tuple2<Payload,String>>.encryptBackToPerson():Mono<Payload> =
             networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple }
 
         .map { (meta, data,clientID) ->
-            Tuples.of(meta,Person.encryptAES(data,people.getOrDefault(clientID,Person.default))) }
+            Tuples.of(meta,Person.encryptAES(data,blockchain.users.map { it.id to it.person }.toMap().getOrDefault(clientID,Person.default))) }
 
         .map { (meta,encrypted) ->
             Tuples.of(meta,gson.toJson(encrypted.toStrings())) }
@@ -75,7 +77,7 @@ class MasterHandler :SocketAcceptor {
                 return Mono.just(payload!!)//TODO make null safe
                     .map { it!! }
                     .map { gson.fromJson(it.dataUtf8,Message::class.java) }
-                    .map { message -> Tuples.of(message.clientID,server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
+                    .map { message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
                     .map { (clientID, plaintextBlob, isValid) ->  Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
                     .map { (clientID, blob, isValid) -> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
                     .map { (clientID, blob, isValid) -> Tuples.of(RequestDataBlob(
@@ -95,7 +97,7 @@ class MasterHandler :SocketAcceptor {
                 return Mono.just(payload!!)
                     .map { it!! }
                     .map { pay :Payload -> gson.fromJson(pay.dataUtf8,Message::class.java) }
-                    .map { message :Message -> Tuples.of(message.clientID,server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
+                    .map { message :Message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
                     .map { (clientID,plaintextBlob,isValid) -> Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
                     .map { (clientID, blob,isValid)-> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
                     .map { (clientID, blob, isValid)  -> Tuples.of(StreamDataBlob(

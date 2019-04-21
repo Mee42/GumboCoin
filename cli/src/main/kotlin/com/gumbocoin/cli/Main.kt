@@ -1,26 +1,32 @@
 package com.gumbocoin.cli
 
-import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
-import io.rsocket.util.DefaultPayload
-import mu.KLogger
 import mu.KotlinLogging
-import reactor.core.Exceptions
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import systems.carson.base.*
 import java.nio.charset.Charset
 import java.util.*
+import kotlin.concurrent.thread
 
 
-val logger = KotlinLogging.logger {  }
+val logger = KotlinLogging.logger { }
 val response = KotlinLogging.logger("Response")
-
 
 val me = Person.generateNew()
 val clientID = UUID.randomUUID().toString().split("-")[0]
 
+fun log(s :Status, success :String){
+    if(s.failed){
+        s.errorMessage.takeIf { it.isNotBlank() }
+            ?.let { logger.warn(it) }
+        s.extraData.takeIf { it.isNotBlank() }
+            ?.let { logger.warn(it) }
+    }else{
+        logger.info(success)
+    }
+}
 fun main() {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "INFO")
 
@@ -30,87 +36,84 @@ fun main() {
             .start()
             .block()!!
     }
-    time("Ping test 1"){
-        socket.requestResponse(Request.Response.PING,NoData)
-            .stringValues()
-            .println()
+
+    time("Ping") { socket.requestResponse(Request.Response.PING, NoData).block() }
+
+
+    time("To register") {
+        socket.requestResponse(Request.Response.SIGN_UP, SignUpAction(clientID ,Base64.getEncoder().encodeToString(me.publicKey.encoded)))
+            .mapFromSendable<Status>()
+            .map { log(it,"Registered successfully") }
             .block()
     }
 
-    println()
 
-    fun hello(i :Int) = "Hello, World: $i"
-    fun me(i :Int) = "cli:\"${hello(i)}\""
-    time("All AES tests") {
-        for (i in 0 until 10) {
-            time("AES test #$i") {
-                val data = hello(i).toByteArray(Charset.forName("UTF-8"))
-                socket.requestResponse(Request.Response.DECRYPT, Person.encryptAES(data, server).toStrings())
-                    .stringValues()
-                    .map { it.trimAESPadding() }
-//                    .println()
-                    .block()
-                    .let {
-                        if(it != me(i))
-                            error("\n\"$it\"\n\'${me(i)}\"\n\n${it?.toByteArray()?.contentToString()}\n${me(i).toByteArray().contentToString()}")
-                    }
+    time("To mine a block") {
+        var updates = Optional.empty<ActionUpdate>()
+        thread(start = true) {
+            Thread.sleep(100)
+            socket.requestStream(Request.Stream.BLOCKCHAIN_UPDATES, NoData)
+                .stringValues()
+                .println()
+                .map { Sendable.deserialize<ActionUpdate>(it) }
+                .subscribe {
+                    updates = Optional.of(it)
+//            println(it.lasthash)
+                }
+        }
+
+        var block: Block? = null
+
+        w@ while (true) {
+            if (updates.isPresent) {
+                logger.info { "Updating block" }
+                val u = updates.get()
+                block = Block(
+                    author = clientID,
+                    actions = u.actions,//TODO plus transaction to myself
+                    timestamp = System.currentTimeMillis(),
+                    nonce = Random().nextLong(),
+                    difficulty = u.difficulty,
+                    lasthash = u.lasthash,
+                    signature = ""
+                )
+                updates = Optional.empty()
+            }
+            if (block != null) {
+                println("trying ${block.hash}")
+                if (block.hash.isValid()) {
+                    //reconstruct block with signature
+                    val new = Block(
+                        block.author,
+                        block.actions,
+                        block.timestamp,
+                        block.nonce,
+                        block.difficulty,
+                        block.lasthash,
+                        me.sign(block.hash.toByteArray(Charset.forName("UTF-8"))).toBase64()
+                    )
+                    logger.info("Sending: $new")
+                    val status = socket.requestResponse(Request.Response.BLOCK, new)
+                        .mapFromSendable<Status>()
+                        .block()!!
+
+                    log(status, "Block accepted successfully")
+                    break@w
+                } else {
+                    block = Block(
+                        block.author,//TODO better mutable block interface
+                        block.actions,
+                        block.timestamp,
+                        block.nonce + 1,
+                        block.difficulty,
+                        block.lasthash,
+                        block.signature
+                    )
+                }
+            } else {
+                println("block is null...")
             }
         }
     }
-
-    println()
-
-
-    time("Ping test 1"){
-        socket.requestResponse(Request.Response.PING,NoData)
-            .stringValues()
-            .println()
-            .block()
-    }
-
-    time("Stream test 0"){
-        socket.requestStream(Request.Stream.NUMBERS,SendableInteger(25))
-            .stringValues()
-            .println()
-            .blockLast()
-    }
-
-    println()
-
-    time("check verification") {
-        socket.requestResponse(Request.Response.VERIFIED,NoData)
-            .stringValues()
-            .map { Sendable.deserialize<SendableBoolean>(it) }
-            .block()
-            ?.let {
-                if(it.value){
-                    logger.info("Successfully verified")
-                }else{
-                    logger.warn("Unsuccessfully verified")
-                }
-            }
-    }
-
-    time("Submit public key"){
-        socket.requestResponse(Request.Response.PUBLIC_KEY,SendableString(me.justPublic().serialize()))
-            .stringValues()
-            .map { Sendable.deserialize<Status>(it) }
-            .printStatus("Attempted to submit public key")
-            .block()
-    }
-
-    time("check verification") {
-        socket.requestResponse(Request.Response.VERIFIED,NoData)
-            .stringValues()
-            .map { Sendable.deserialize<SendableBoolean>(it) }
-            .block()
-            ?.let {
-                if(it.value){
-                    logger.info("Successfully verified")
-                }else{
-                    logger.warn("Unsuccessfully verified")
-                }
-            }
-    }
-
 }
+

@@ -1,0 +1,15 @@
+
+Blockchain
+  |- blocks     :List<Block>
+
+Block
+  |- author     :String
+  |- actions    :List<Action>
+  |- timestamp  :Long
+  |- nonce      :Long
+  |- difficulty :Long
+  |- lasthash   :String
+  |- signature  :String
+
+Action
+  |- type       :ActionType

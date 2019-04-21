@@ -48,6 +48,10 @@ fun String.trimAESPadding():String{
 
 
 
+inline fun <reified T:Sendable> Flux<ByteArray>.mapFromSendable():Flux<T> = map { it.toString(Charset.forName("UTF-8")) }.map { Sendable.deserialize<T>(it) }
+inline fun <reified T:Sendable> Mono<ByteArray>.mapFromSendable():Mono<T> = map { it.toString(Charset.forName("UTF-8")) }.map { Sendable.deserialize<T>(it) }
+
+
 fun Flux<ByteArray>.stringValues() : Flux<String> = map { it.toString(Charset.forName("UTF-8")) }
 fun Mono<ByteArray>.stringValues() : Mono<String> = map { it.toString(Charset.forName("UTF-8")) }
 

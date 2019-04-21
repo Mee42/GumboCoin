@@ -20,6 +20,7 @@ class Signature(val byteArray: ByteArray) {
     fun toBase64() :String = Base64.encodeBase64String(byteArray)
     companion object{
         fun fromBase64(string :String):Signature = Signature(Base64.decodeBase64(string))
+        val VOID :Signature by lazy { Signature(ByteArray(0) { 0 }) }
     }
 }
 

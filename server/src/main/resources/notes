@@ -1,0 +1,6 @@
+
+
+
+users:
+  |- miner. This account is used to mine the first couple blocks. stored in keyfile
+  |- server. This is important. stored in keyfile, public key in code.

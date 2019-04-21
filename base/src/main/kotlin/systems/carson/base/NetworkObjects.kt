@@ -2,6 +2,8 @@ package systems.carson.base
 
 import com.google.gson.Gson
 import com.google.gson.GsonBuilder
+import io.rsocket.Payload
+import io.rsocket.util.DefaultPayload
 import org.apache.commons.codec.binary.Base64
 import java.util.*
 
@@ -12,22 +14,6 @@ val gson : Gson = GsonBuilder()
     .setLenient()
     .create()
 
-
-class Request{
-
-    enum class Response(val intent :String){
-        PING("ping"),
-        DECRYPT("decryptAES"),
-        VERIFIED("verified"),
-        PUBLIC_KEY("public-key")
-    }
-    enum class Stream(val intent :String){
-        NUMBERS("numbers")
-    }
-    enum class Fire(val intent :String){
-
-    }
-}
 
 class DataBlob(
     val intent :String,
@@ -45,11 +31,11 @@ class StreamDataBlob(
     val data :ReceivedData,
     val isVerified :Boolean)
 
-class FireDataBlob(
-    val intent :Request.Fire,
-    val clientID :String,
-    val data :ReceivedData,
-    val isVerified :Boolean)
+//class FireDataBlob(
+//    val intent :Request.Fire,
+//    val clientID :String,
+//    val data :ReceivedData,
+//    val isVerified :Boolean)
 
 class ReceivedData(val data :String){
     fun base64() :ByteArray{
@@ -65,6 +51,9 @@ class Status(
     val errorMessage :String = "",
     val extraData :String = "") :Sendable
 
+class ActionUpdate(val actions :List<Action>, val lasthash :String, val difficulty :Long):Sendable
+
+
 class Message(
     val encryptedData: EncryptedString,
     val clientID: String,
@@ -77,6 +66,7 @@ interface Sendable{
     fun send() :String{
         return gson.toJson(this)
     }
+    fun toPayload(): Payload = DefaultPayload.create(this.send())
     companion object
 }
 

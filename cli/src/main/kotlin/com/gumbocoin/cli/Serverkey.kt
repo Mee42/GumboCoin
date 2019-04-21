@@ -3,11 +3,11 @@ package com.gumbocoin.cli
 import systems.carson.base.Person
 
 val server = Person.deserialize("""
-    --- BEGIN PUBLIC KEY ---
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvw3qb27mUV7xATiaThl9qMDpEx9U1go/IG+F
-pyoNYRwAbYIC90wJPl37V3xJTP5Z9+viXXJEB7N4cEAi4v/o1GNIUpfKdaCnRLPs+I5aptzjoCe4hJkA
-CPa0fNpYaKyI7YWJaPonRd7s28TRXJN/Be4vzreuYKbe4jJG3Gdb2eZSafu8hN+hPXW77u7D/zgD8PzG
-LPXrO5BE0I//X5QycemgkeZB5Lo1boUjtfi+R3J7B2wPNm+THDQymIldlL4wYksxnaaQo5HwP7QtYIAV
-VmbSe82r/hAaKC+Oc554dViYcBI5veqgTeUT41qBnEJpjJQwgaCOw4Rgi+GiANyKaQIDAQAB
+--- BEGIN PUBLIC KEY ---
+MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAqBWysvscw60qhgyfIUP4b/suNdOw4Yhjzggh
+DbhiFuC9g+X9NCGFEWsXflVMjbzyIDoK239P6bcJt7hmlwByvg317C0/y7hBHTL9R3OEipuHZeNoGXNG
+Wb1E2ubGEClwMKK8SKerBeTP3JPhTtCVz0XOcbHhS0/m6TjBgXQrTGxJ1V53qltxxZ/pggvukhNpdXAB
+8GeFG7DMP6ypF9F8MNok+Rvoxk1uV9JxzSMtl4LvqLxkXBcYvUUYdOgoOPPpG56tTz3g3lkhbKRJjnJ2
+BA6UEambgpxfYoLQ0bQlhXoPQHB3aFJqstCucKSTA7Es2iMWuwrYyWWkpjrenPqP3QIDAQAB
 --- END PUBLIC KEY ---
 """.trimIndent())

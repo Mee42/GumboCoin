@@ -21,7 +21,6 @@ const val END_PRIVATE = "--- END PRIVATE KEY ---"
 class Person private constructor(
                   private val keyPair: KeyPair) {
 
-    val logger = KotlinLogging.logger {  }
 
     val publicKey : PublicKey
         get() = keyPair.public ?: error("Current Person implementation doesn't support functions that use the public key")
@@ -108,9 +107,7 @@ class Person private constructor(
                 str = str.substring(0,str.indexOf(END_PRIVATE))
                     .replace("\n","")
                     .trim()
-                val encoded= Base64.decodeBase64(str)
-                val spec = PKCS8EncodedKeySpec(encoded)
-                private = KeyFactory.getInstance("RSA").generatePrivate(spec)
+                private = priv(str)
             }
             if(string.contains(START_PUBLIC)){
 //                println("finding public")
@@ -120,20 +117,36 @@ class Person private constructor(
                 str = str.substring(0,str.indexOf(END_PUBLIC))
                     .replace("\n","")
                     .trim()
-                val encoded = Base64.decodeBase64(str)
-                val spec = X509EncodedKeySpec(encoded)
-                public = KeyFactory.getInstance("RSA").generatePublic(spec)
+                public = pub(str)
             }
             if(public == null && private != null)
                 return fromPrivateKey(private)
             return fromKeyPair(KeyPair(public,private))
         }
+        /** Takes Base64 */
+        private fun pub(s :String):PublicKey{
+            val encoded = Base64.decodeBase64(s)
+            val spec = X509EncodedKeySpec(encoded)
+            return KeyFactory.getInstance("RSA").generatePublic(spec)
+        }
+        /** Takes Base64 */
+        private fun priv(s :String):PrivateKey{
+            val encoded= Base64.decodeBase64(s)
+            val spec = PKCS8EncodedKeySpec(encoded)
+            return  KeyFactory.getInstance("RSA").generatePrivate(spec)
+        }
+
         val default by lazy { deterministicFromString("asdfklujgahsdk tfygakuyfg taysjmd cgbrtjfaeuwyrctg ayesfgvr jayewuv rcfjuaywekv ftbruckasefvg uj ebrstyjuwesbct vfrhyasdgvf anhysertcfgyasdjya") }
 
 
         //generators
         fun fromKeyPair(keyPair: KeyPair):Person = Person(keyPair)
         fun fromPublicKey(publicKey: PublicKey):Person = Person(KeyPair(publicKey,null))
+        /** Takes Base64 */
+        fun fromPublicKey(string :String):Person {
+            println(string)
+            return fromPublicKey(pub(string))
+        }
         fun fromPrivateKey(privateKey: PrivateKey):Person {
             //attempt to find the correct public key
             if(privateKey !is RSAPrivateCrtKey)
@@ -157,6 +170,8 @@ class Person private constructor(
         sig.update(data)
         return Signature(sig.sign())
     }
+
+
 
     fun fingerprint():String = DigestUtils.sha1Hex(publicKey.encoded)
 
