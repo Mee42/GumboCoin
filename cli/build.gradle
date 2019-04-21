@@ -19,6 +19,13 @@ dependencies {
     implementation 'io.rsocket:rsocket-transport-netty:0.11.14'
     implementation project(':base')
 
+    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta4'
+    implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.8.0-beta4'
+
+    compile 'io.github.microutils:kotlin-logging:1.5.9'
+
+
+
 }
 
 compileKotlin {
@@ -27,3 +34,4 @@ compileKotlin {
 compileTestKotlin {
     kotlinOptions.jvmTarget = "1.8"
 }
+version 'unspecified'

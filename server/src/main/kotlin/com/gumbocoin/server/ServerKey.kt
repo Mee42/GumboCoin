@@ -1,11 +1,11 @@
-package systems.carson.base
+package com.gumbocoin.server
 
-import java.security.PrivateKey
-import java.security.PublicKey
+import systems.carson.base.Person
 
-object ServerKey {
-    private val string = """
---- BEGIN PRIVATE KEY ---
+
+
+val server = Person.deserialize("""
+    --- BEGIN PRIVATE KEY ---
 MIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQC/DepvbuZRXvEBOJpOGX2owOkTH1TW
 Cj8gb4WnKg1hHABtggL3TAk+XftXfElM/ln36+JdckQHs3hwQCLi/+jUY0hSl8p1oKdEs+z4jlqm3OOg
 J7iEmQAI9rR82lhorIjthYlo+idF3uzbxNFck38F7i/Ot65gpt7iMkbcZ1vZ5lJp+7yE36E9dbvu7sP/
@@ -28,26 +28,11 @@ X6VIddj5MP+ba6Hc/2lBYhV/sKpQ+MzrdjVD93kuxLpAYVxRi0gVhbZHTQU+JiGE89tA4S297U2QXTZC
 /UZck5FRwmDQBvNYfFJ6Hj0iZ+kkizaZWMKTLPHC9f714AINNK2c1+n/QgNUVqOJZJI4iVhOO2bq37S9
 fueAPv7epauTTdbNiT1qpQqZ
 --- END PRIVATE KEY ---
---- BEGIN PUBLIC KEY ---
+    --- BEGIN PUBLIC KEY ---
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAvw3qb27mUV7xATiaThl9qMDpEx9U1go/IG+F
 pyoNYRwAbYIC90wJPl37V3xJTP5Z9+viXXJEB7N4cEAi4v/o1GNIUpfKdaCnRLPs+I5aptzjoCe4hJkA
 CPa0fNpYaKyI7YWJaPonRd7s28TRXJN/Be4vzreuYKbe4jJG3Gdb2eZSafu8hN+hPXW77u7D/zgD8PzG
 LPXrO5BE0I//X5QycemgkeZB5Lo1boUjtfi+R3J7B2wPNm+THDQymIldlL4wYksxnaaQo5HwP7QtYIAV
 VmbSe82r/hAaKC+Oc554dViYcBI5veqgTeUT41qBnEJpjJQwgaCOw4Rgi+GiANyKaQIDAQAB
 --- END PUBLIC KEY ---
-    """.trimIndent()
-    private val person = Person.deserialize(string)
-
-    fun publicKey():PublicKey{
-        return person.publicKey
-    }
-    private const val password = "6Lu+ji1ljuucZBctWAeJX3ld0kceqCSai6PlBwWxz"
-    fun person(password :String): Person {
-        if(this.password != password) {
-            //TODO remove private key from client-side generation.
-            error("Can't get private key without password\nTHE CLIENT CAN NOT ACCESS THE PRIVATE KEY")
-        }
-        return person
-    }
-
-}
+""".trimIndent())

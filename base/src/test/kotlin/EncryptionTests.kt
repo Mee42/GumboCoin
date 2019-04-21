@@ -49,7 +49,7 @@ internal class EncryptionTests {
 
     @Test
     fun `Can't sign without a private key`(){
-        assertThrows(IllegalStateException::class.java, { publicBobRandom().sign(randomData()) },"Expected sign without private key to fail")
+        assertThrows(IllegalStateException::class.java, { publicBobRandom().sign(randomData()) },"Expected sign without private key to failed")
     }
 
     @Test
@@ -99,17 +99,17 @@ internal class EncryptionTests {
         val public = publicBob()
 
         val data = randomData()
-        val encrypted = Person.encrypt(data,public)
+        val encrypted = Person.encryptRSA(data,public)
         assertNotEquals(data,encrypted)
-        val plaintext = private.decrypt(encrypted)
+        val plaintext = private.decryptRSA(encrypted)
         assertEquals(data.contentToString(),plaintext.contentToString())
     }
 
     @Test
     fun `Can't decrypt without the private key`(){
         val public = publicBobRandom()
-        val encrypted = Person.encrypt(randomData(),public)
-        assertThrows(IllegalStateException::class.java) { public.decrypt(encrypted) }
+        val encrypted = Person.encryptRSA(randomData(),public)
+        assertThrows(IllegalStateException::class.java) { public.decryptRSA(encrypted) }
     }
 
     @Test
@@ -117,23 +117,23 @@ internal class EncryptionTests {
         val public = publicBob()
         val private = privateAlice()
         val data = randomData()
-        val encrypted = Person.encrypt(data,public)
-        val message = assertThrows(IllegalAccessException::class.java) { private.decrypt(encrypted) }.message
-        assertEquals("Unable to decrypt data with given key", message)
+        val encrypted = Person.encryptRSA(data,public)
+        val message = assertThrows(IllegalAccessException::class.java) { private.decryptRSA(encrypted) }.message
+        assertEquals("Unable to decryptRSA data with given key", message)
     }
 
     @Test
     fun `Can encrypt exactly MAX_RSA bytes`(){
         val data = randomData(Person.MAX_RSA_BYTES)
         val bob = privateBob()
-        Person.encrypt(data,bob)
+        Person.encryptRSA(data,bob)
     }
 
     @Test
     fun `Can't encrypt more then MAX_RSA bytes`(){
         val data = randomData(Person.MAX_RSA_BYTES + 1)
         val bob = privateBob()
-        assertThrows(IllegalBlockSizeException::class.java) { Person.encrypt(data,bob) }
+        assertThrows(IllegalBlockSizeException::class.java) { Person.encryptRSA(data,bob) }
     }
 
     @Test
@@ -164,7 +164,7 @@ internal class EncryptionTests {
     fun `RSA works with 0 bytes`(){
         val data = ByteArray(0) { 0 }
         val bob = privateBob()
-        val plaintext = bob.decrypt(Person.encrypt(data,bob))
+        val plaintext = bob.decryptRSA(Person.encryptRSA(data,bob))
         assertByteArraysEquals(data,plaintext)
     }
 

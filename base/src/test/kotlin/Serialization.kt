@@ -30,7 +30,7 @@ internal class Serialization {
     fun `Serialize just the public key`(){
         val person = publicBob()
         val serialized = person.serialize()
-        println(serialized)
+//        println(serialized)
         val new = Person.deserialize(serialized)
         assertEquals(person,new)
     }

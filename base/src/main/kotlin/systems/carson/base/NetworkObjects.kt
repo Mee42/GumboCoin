@@ -8,15 +8,18 @@ import java.util.*
 
 const val PORT = 48626
 
-val gson : Gson = GsonBuilder().create()
+val gson : Gson = GsonBuilder()
+    .setLenient()
+    .create()
 
 
 class Request{
 
     enum class Response(val intent :String){
         PING("ping"),
-        DECRYPT("decrypt"),
-        VERIFIED("verified")//TODO("SHould return like a boolean or soemthing if the sig is present and works")
+        DECRYPT("decryptAES"),
+        VERIFIED("verified"),
+        PUBLIC_KEY("public-key")
     }
     enum class Stream(val intent :String){
         NUMBERS("numbers")
@@ -57,6 +60,11 @@ class ReceivedData(val data :String){
     }
 }
 
+class Status(
+    val failed :Boolean = false,
+    val errorMessage :String = "",
+    val extraData :String = "") :Sendable
+
 class Message(
     val encryptedData: EncryptedString,
     val clientID: String,
@@ -69,10 +77,16 @@ interface Sendable{
     fun send() :String{
         return gson.toJson(this)
     }
+    companion object
+}
+
+inline fun <reified T :Sendable> Sendable.Companion.deserialize(string :String):T{
+    return gson.fromJson(string.trimEnd { it == (0).toChar() },T::class.java)
 }
 
 class SendableInteger(val value: Int):Sendable
 class SendableString(val value :String):Sendable
+class SendableBoolean(val value :Boolean):Sendable
 object NoData :Sendable{
     override fun send() = ""
 }

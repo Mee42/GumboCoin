@@ -2,10 +2,12 @@ package com.gumbocoin.server
 
 import io.rsocket.*
 import io.rsocket.util.DefaultPayload
+import mu.KotlinLogging
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.util.function.Tuple2
 import reactor.util.function.Tuple3
+import reactor.util.function.Tuple4
 import reactor.util.function.Tuples
 import systems.carson.base.*
 import java.nio.charset.Charset
@@ -24,68 +26,90 @@ fun isValid(message: Message):Boolean{
     return Person.verify(people[message.clientID]!!,sig,data)
 }
 
+operator fun <T1,T2> Tuple2<T1,T2>.component1():T1{
+    return t1
+}
+operator fun <T1,T2> Tuple2<T1,T2>.component2():T2{
+    return t2
+}
+operator fun <T1,T2,T3> Tuple3<T1,T2,T3>.component3():T3{
+    return t3
+}
+operator fun <T1,T2,T3,T4> Tuple4<T1, T2, T3, T4>.component4():T4{
+    return t4
+}
+
+val networkLogger = KotlinLogging.logger {}
+
+private fun Mono<Tuple2<Payload,String>>.encryptBackToPerson():Mono<Payload> =
+    map { (payload, clientID) ->
+        Tuples.of(if(payload.hasMetadata()) payload.metadataUtf8 else "",payload.data.array(),clientID) }
+
+        .map { tuple ->
+            networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple }
+
+        .map { (meta, data,clientID) ->
+            Tuples.of(meta,Person.encryptAES(data,people.getOrDefault(clientID,Person.default))) }
+
+        .map { (meta,encrypted) ->
+            Tuples.of(meta,gson.toJson(encrypted.toStrings())) }
+
+        .map { tuple -> networkLogger.debug("encrypted:$tuple");tuple }
+
+        .map { tuple -> networkLogger.debug(tuple.t2);tuple }
+
+        .map { (meta, data) ->
+            if(meta == "")
+                DefaultPayload.create(data)
+            else
+                DefaultPayload.create(data,Charset.forName("UTF-8"),meta,Charset.forName("UTF-8"))
+        }
+
+
+private fun Flux<Tuple2<Payload,String>>.encryptBackToPerson():Flux<Payload> = flatMap { Mono.just(it).encryptBackToPerson() }//I hate myself but how
+
 class MasterHandler :SocketAcceptor {
     override fun accept(setup: ConnectionSetupPayload?, sendingSocket: RSocket?): Mono<RSocket> {
         return Mono.just(object :AbstractRSocket(){
             override fun requestResponse(payload: Payload?): Mono<Payload> {
-                return Mono.justOrEmpty(payload)
+                return Mono.just(payload!!)//TODO make null safe
                     .map { it!! }
                     .map { gson.fromJson(it.dataUtf8,Message::class.java) }
-                    .map { message :Message -> Tuples.of(message,isValid(message)) }
-                    .map { tuple :Tuple2<Message,Boolean> -> Tuples.of(tuple.t1.clientID,server.decryptAES(tuple.t1.encryptedData.toBytes()),tuple.t2) }
-                    .map { tuple: Tuple3<String, ByteArray, Boolean> ->  Tuples.of(tuple.t1,tuple.t2.toString(Charset.forName("UTF-8")),tuple.t3) }
-                    .map { println("request   :id=${it.t1}, verified=${it.t3} blob=${it.t2}");it }
-                    .map { tuple: Tuple3<String, String, Boolean> -> Tuples.of(tuple.t1,gson.fromJson(tuple.t2,DataBlob::class.java),tuple.t3) }
-                    .map { tuple :Tuple3<String,DataBlob,Boolean> -> RequestDataBlob(
-                        clientID = tuple.t1,
-                        intent = Request.Response.values().first { value -> value.intent == tuple.t2.intent },
-                        data = ReceivedData(tuple.t2.data),
-                        isVerified = tuple.t3
-                    ) }
-                    .map { getResponseHandler(it).invoke(it) }
+                    .map { message -> Tuples.of(message.clientID,server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
+                    .map { (clientID, plaintextBlob, isValid) ->  Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
+                    .map { (clientID, blob, isValid) -> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
+                    .map { (clientID, blob, isValid) -> Tuples.of(RequestDataBlob(
+                        clientID = clientID,
+                        intent = Request.Response.values().first { value -> value.intent == blob.intent },// TODO("firstOrNull") ?: error("Can't find handler for intent ${blob.intent}"),
+                        data = ReceivedData(blob.data),
+                        isVerified = isValid
+                    ),clientID) }
+                    .map { networkLogger.info("request   :" + gson.toJson(it.t1));it }
+                    .map { (data, id) -> Tuples.of(getResponseHandler(data).invoke(data),id) }
+                    .encryptBackToPerson()
+                    .map { itt -> networkLogger.debug("Sending back:${itt.dataUtf8}");itt}
+
             }
 
             override fun requestStream(payload: Payload?): Flux<Payload> {
-                return Mono.justOrEmpty(payload)
+                return Mono.just(payload!!)
                     .map { it!! }
-                    .doOnNext { println("stream    :" + it.dataUtf8) }
-                    .map { gson.fromJson(it.dataUtf8,Message::class.java) }
-                    .map { Tuples.of(it.clientID,server.decryptAES(it.encryptedData.toBytes())) }
-                    .map { Tuples.of(it.t1,it.t2.toString(Charset.forName("UTF-8")))}
-                    .map { Tuples.of(it.t1,gson.fromJson(it.t2,DataBlob::class.java))}
-                    .map { tuple  -> StreamDataBlob(
-                        clientID = tuple.t1,
-                        intent = Request.Stream.values().first { value -> value.intent == tuple.t2.intent },
-                        data = ReceivedData(tuple.t2.data),
-                        isVerified = false//TODO
-                    ) }
-                    .flatMapMany { getStreamHandler(it).invoke(it) }
+                    .map { pay :Payload -> gson.fromJson(pay.dataUtf8,Message::class.java) }
+                    .map { message :Message -> Tuples.of(message.clientID,server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
+                    .map { (clientID,plaintextBlob,isValid) -> Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
+                    .map { (clientID, blob,isValid)-> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
+                    .map { (clientID, blob, isValid)  -> Tuples.of(StreamDataBlob(
+                        clientID = clientID,
+                        intent = Request.Stream.values().first { value -> value.intent == blob.intent },// TODO("firstOrNull") ?: error("Can't find handler for intent ${blob.intent}"),
+                        data = ReceivedData(blob.data),
+                        isVerified = isValid
+                    ),clientID) }
+                    .map { networkLogger.info("stream    :" + gson.toJson(it.t1));it }
+                    .flatMapMany { (blob: StreamDataBlob, clientID :String) -> getStreamHandler(blob).invoke(blob).map { Tuples.of(it,clientID) } }
+                    .encryptBackToPerson()
             }
         })
     }
 }
 
-private fun Flux<String>.toPayloads() :Flux<Payload> = this.map { it.toPayload() }
-
-fun getStreamHandler(payload :StreamDataBlob) :(StreamDataBlob) -> Flux<Payload> = when(payload.intent){
-    Request.Stream.NUMBERS -> { pay ->
-        Mono.fromCallable { pay.data.fromJson<SendableInteger>().value }
-            .filter { it != null }
-            .map { it!! }
-            .flatMapMany { count -> Flux.range(0,count) }
-            .map { it.toString() }
-            .toPayloads()
-    }
-}
-
-fun getResponseHandler(payloadInital :RequestDataBlob):(RequestDataBlob) -> Payload {
-    return when (payloadInital.intent) {
-        Request.Response.PING -> { _ -> "pong".toPayload() }
-        Request.Response.DECRYPT -> { pay ->
-            val plain = server.decryptAES(pay.data.fromJson<EncryptedString>().toBytes())
-            "cli:\"${plain.toString(Charset.forName("UTF-8"))}\"".toPayload()
-        }
-
-    }
-}
 

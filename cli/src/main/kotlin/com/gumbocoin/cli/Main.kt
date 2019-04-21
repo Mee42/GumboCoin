@@ -4,42 +4,26 @@ import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import io.rsocket.util.DefaultPayload
+import mu.KLogger
+import mu.KotlinLogging
+import reactor.core.Exceptions
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
-import reactor.core.publisher.toMono
 import systems.carson.base.*
 import java.nio.charset.Charset
-import java.time.Duration
+import java.util.*
 
 
-private class Timer{
-    private var start :Long = -1
-    private var end :Long = -1
-    fun start(){ start = System.nanoTime() }
-    fun end(){ end = System.nanoTime() }
-    fun elapsed():Duration { return Duration.ofNanos(end - start) }
-    override fun toString() :String {
-        val t = elapsed()
-        val hours = t.toHoursPart()
-        val minutes = t.toMinutesPart()
-        val seconds = t.toSecondsPart()
-        val ms = t.toMillisPart()
-        var s = ""
-        if(hours != 0) s+= "" + hours + "h "
-        if(minutes != 0) s+= "" + minutes + "m "
-        if(seconds != 0) s+= "" + seconds + "s "
-        if(ms != 0) s+= "" + ms + "ms "
-        if(s == "")
-            s = "No time elapsed"
-        return s.trim()
-    }
+val logger = KotlinLogging.logger {  }
+val response = KotlinLogging.logger("Response")
 
-}
 
-val server = Person.fromPublicKey(ServerKey.publicKey())
-
+val me = Person.generateNew()
+val clientID = UUID.randomUUID().toString().split("-")[0]
 
 fun main() {
+    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "INFO")
+
     val socket = time("RSocket created") {
         RSocketFactory.connect()
             .transport(TcpClientTransport.create("localhost", PORT))
@@ -55,19 +39,27 @@ fun main() {
 
     println()
 
+    fun hello(i :Int) = "Hello, World: $i"
+    fun me(i :Int) = "cli:\"${hello(i)}\""
     time("All AES tests") {
         for (i in 0 until 10) {
             time("AES test #$i") {
-                val data = "Hello, World: $i".toByteArray(Charset.forName("UTF-8"))
+                val data = hello(i).toByteArray(Charset.forName("UTF-8"))
                 socket.requestResponse(Request.Response.DECRYPT, Person.encryptAES(data, server).toStrings())
                     .stringValues()
+                    .map { it.trimAESPadding() }
 //                    .println()
                     .block()
+                    .let {
+                        if(it != me(i))
+                            error("\n\"$it\"\n\'${me(i)}\"\n\n${it?.toByteArray()?.contentToString()}\n${me(i).toByteArray().contentToString()}")
+                    }
             }
         }
     }
 
     println()
+
 
     time("Ping test 1"){
         socket.requestResponse(Request.Response.PING,NoData)
@@ -76,55 +68,49 @@ fun main() {
             .block()
     }
 
+    time("Stream test 0"){
+        socket.requestStream(Request.Stream.NUMBERS,SendableInteger(25))
+            .stringValues()
+            .println()
+            .blockLast()
+    }
 
+    println()
 
+    time("check verification") {
+        socket.requestResponse(Request.Response.VERIFIED,NoData)
+            .stringValues()
+            .map { Sendable.deserialize<SendableBoolean>(it) }
+            .block()
+            ?.let {
+                if(it.value){
+                    logger.info("Successfully verified")
+                }else{
+                    logger.warn("Unsuccessfully verified")
+                }
+            }
+    }
+
+    time("Submit public key"){
+        socket.requestResponse(Request.Response.PUBLIC_KEY,SendableString(me.justPublic().serialize()))
+            .stringValues()
+            .map { Sendable.deserialize<Status>(it) }
+            .printStatus("Attempted to submit public key")
+            .block()
+    }
+
+    time("check verification") {
+        socket.requestResponse(Request.Response.VERIFIED,NoData)
+            .stringValues()
+            .map { Sendable.deserialize<SendableBoolean>(it) }
+            .block()
+            ?.let {
+                if(it.value){
+                    logger.info("Successfully verified")
+                }else{
+                    logger.warn("Unsuccessfully verified")
+                }
+            }
+    }
 
 }
-
-private fun <T> time(print :String, closure :() -> T):T{
-    val timer = Timer()
-    timer.start()
-    val t = closure()
-    timer.end()
-    println("$print: $timer")
-    return t
-}
-
-
-private fun Flux<ByteArray>.stringValues() :Flux<String> = map { it.toString(Charset.forName("UTF-8")) }
-private fun Mono<ByteArray>.stringValues() :Mono<String> = map { it.toString(Charset.forName("UTF-8")) }
-
-private fun Flux<String>.println() :Flux<String> = map { println(it);it }
-private fun Mono<String>.println() :Mono<String> = map { println(it);it }
-
-
-fun RSocket.requestStream(req :Request.Stream, data: Sendable) : Flux<ByteArray> = Mono.fromCallable {
-    DataBlob(
-        intent = req.intent,
-        data = data.send()
-//        clientID = "cli"
-    )
-}.thenMany { TODO();arrayOf<Byte>().toByteArray() }
-//    .map { gson.toJson(it) }
-//    .map { it.toByteArray(Charset.forName("UTF-8")) }
-//    .map { Person.encryptAES(it,server) }
-//    .map { it :ByteArray -> DefaultPayload.create(it) }
-//    .flatMapMany { requestStream(it) }
-//    .map { it.data.array() }
-
-val me = Person.generateNew()
-
-fun RSocket.requestResponse(req : Request.Response, data :Sendable) :Mono<ByteArray> =
-    Mono.fromCallable { DataBlob(req.intent, data.send()) }
-        .map { gson.toJson(it) }
-        .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")),server) }
-        .map { encrypted :EncryptedBytes -> Message(
-            clientID = "cli",
-            encryptedData = encrypted.toStrings(),
-            signature = me.sign(encrypted.concat()).toBase64()
-        ) }
-        .map { message: Message -> gson.toJson(message) }
-        .map { it.toByteArray(Charset.forName("UTF-8")) }
-        .map { DefaultPayload.create(it) }
-        .flatMap { requestResponse(it) }
-        .map { it.data.array() }

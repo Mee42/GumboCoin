@@ -16,3 +16,5 @@ include 'base'
 include 'server'
 include 'website'
 include 'cli'
+include 'cli'
+

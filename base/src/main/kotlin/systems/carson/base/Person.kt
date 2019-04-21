@@ -1,17 +1,16 @@
 package systems.carson.base
 
+import mu.KotlinLogging
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.digest.DigestUtils
 import java.security.*
 import java.security.interfaces.RSAPrivateCrtKey
-import java.security.interfaces.RSAPublicKey
 import java.security.spec.*
 import javax.crypto.BadPaddingException
 import javax.crypto.Cipher
 import javax.crypto.KeyGenerator
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
-import kotlin.reflect.full.primaryConstructor
 
 const val START_PUBLIC = "--- BEGIN PUBLIC KEY ---"
 const val END_PUBLIC = "--- END PUBLIC KEY ---"
@@ -21,6 +20,8 @@ const val END_PRIVATE = "--- END PRIVATE KEY ---"
 
 class Person private constructor(
                   private val keyPair: KeyPair) {
+
+    val logger = KotlinLogging.logger {  }
 
     val publicKey : PublicKey
         get() = keyPair.public ?: error("Current Person implementation doesn't support functions that use the public key")
@@ -47,10 +48,10 @@ class Person private constructor(
             return verify(person.publicKey,signature,data)
         }
 
-        /** This will encrypt over 245 bytes */
+        /** This will encryptRSA over 245 bytes */
         fun encryptAES(data :ByteArray,person :Person):EncryptedBytes = encryptAES(data,person.publicKey)
 
-        /** This will encrypt over 245 bytes */
+        /** This will encryptRSA over 245 bytes */
         fun encryptAES(data :ByteArray, publicKey : PublicKey): EncryptedBytes {
             val iv = ByteArray(16) { -1 }
             SecureRandom.getInstanceStrong().nextBytes(iv)
@@ -65,7 +66,7 @@ class Person private constructor(
             aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
 
             val final = aesCipher.doFinal(data)
-            return EncryptedBytes(iv, encrypt(secretKey.encoded,publicKey), final)
+            return EncryptedBytes(iv, encryptRSA(secretKey.encoded,publicKey), final)
             //need to return encrypted secret key and the encrypted message
         }
         //buildKeyPair(DigestUtils.sha1(name)!!.contentHashCode().toLong())
@@ -86,14 +87,14 @@ class Person private constructor(
         }
 
         /** This needs to be below 245 bytes */
-        fun encrypt(data :ByteArray, publicKey: PublicKey): ByteArray {
+        fun encryptRSA(data :ByteArray, publicKey: PublicKey): ByteArray {
             val cipher = Cipher.getInstance("RSA")
             cipher.init(Cipher.ENCRYPT_MODE, publicKey)
             return cipher.doFinal(data)
         }
 
         /** This needs to be below 245 bytes */
-        fun encrypt(data :ByteArray, person :Person):ByteArray = encrypt(data,person.publicKey)
+        fun encryptRSA(data :ByteArray, person :Person):ByteArray = encryptRSA(data,person.publicKey)
 
 
         fun deserialize(string :String):Person{
@@ -101,30 +102,34 @@ class Person private constructor(
             var public :PublicKey? = null
             if(string.contains(START_PRIVATE)){
 //                println("finding private")
-                val str = string
+                var str = string
                     .substring(string.indexOf(START_PRIVATE))
                     .replaceFirst(START_PRIVATE,"")
-                    .substring(0,string.indexOf(END_PRIVATE))
+                str = str.substring(0,str.indexOf(END_PRIVATE))
                     .replace("\n","")
                     .trim()
                 val encoded= Base64.decodeBase64(str)
                 val spec = PKCS8EncodedKeySpec(encoded)
                 private = KeyFactory.getInstance("RSA").generatePrivate(spec)
             }
-//            if(string.contains(START_PUBLIC)){
+            if(string.contains(START_PUBLIC)){
 //                println("finding public")
-//                val str = string
-//                    .substring(string.indexOf(START_PUBLIC))
-//                    .replaceFirst(START_PUBLIC,"")
-//                    .substring(0,string.indexOf(END_PRIVATE))
-//                    .replace("\n","")
-//                    .trim()
-//                val encoded = Base64.decodeBase64(str)
-//            }
-            if(private != null)
+                var str = string
+                    .substring(string.indexOf(START_PUBLIC))
+                    .replaceFirst(START_PUBLIC,"")
+                str = str.substring(0,str.indexOf(END_PUBLIC))
+                    .replace("\n","")
+                    .trim()
+                val encoded = Base64.decodeBase64(str)
+                val spec = X509EncodedKeySpec(encoded)
+                public = KeyFactory.getInstance("RSA").generatePublic(spec)
+            }
+            if(public == null && private != null)
                 return fromPrivateKey(private)
-            TODO("Public key decryption doesn't work to well yet")
+            return fromKeyPair(KeyPair(public,private))
         }
+        val default by lazy { deterministicFromString("asdfklujgahsdk tfygakuyfg taysjmd cgbrtjfaeuwyrctg ayesfgvr jayewuv rcfjuaywekv ftbruckasefvg uj ebrstyjuwesbct vfrhyasdgvf anhysertcfgyasdjya") }
+
 
         //generators
         fun fromKeyPair(keyPair: KeyPair):Person = Person(keyPair)
@@ -156,14 +161,14 @@ class Person private constructor(
     fun fingerprint():String = DigestUtils.sha1Hex(publicKey.encoded)
 
     /** This needs to be below 245 bytes */
-    fun decrypt(encrypted: ByteArray): ByteArray {
+    fun decryptRSA(encrypted: ByteArray): ByteArray {
         val cipher = Cipher.getInstance("RSA")
         cipher.init(Cipher.DECRYPT_MODE, privateKey)
         try {
             return cipher.doFinal(encrypted)
         }catch(e : BadPaddingException){
 //            if(e.message == "Decryption error"){
-                val new = IllegalAccessException("Unable to decrypt data with given key")
+                val new = IllegalAccessException("Unable to decryptRSA data with given key")
                 new.addSuppressed(e)
                 throw new
 //            }
@@ -171,13 +176,23 @@ class Person private constructor(
         }
     }
 
+    fun decryptAESAndTestDefaultKey(data :EncryptedBytes):ByteArray =
+        try{
+            decryptAES(data)
+        }catch(e :IllegalAccessException){
+            try {
+                Person.default.decryptAES(data)
+            }catch(e :IllegalAccessException){
+                throw IllegalStateException("Both keys failed to decrypt",e)
+            }
+        }
 
 
     fun decryptAES(data : EncryptedBytes) :ByteArray{
         val iv = data.iv
         val ivParameterSpec = IvParameterSpec(iv)
 
-        val decryptedSecretKey = decrypt(data.encryptedSecretKey)
+        val decryptedSecretKey = decryptRSA(data.encryptedSecretKey)
 
         val secretKey = SecretKeySpec(decryptedSecretKey, 0, decryptedSecretKey.size, "AES")
 
@@ -231,6 +246,8 @@ class Person private constructor(
     override fun hashCode(): Int {
         return keyPair.hashCode()
     }
+
+    fun justPublic() = fromPublicKey(publicKey)
 
 
 }
