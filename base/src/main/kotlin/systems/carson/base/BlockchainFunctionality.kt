@@ -10,16 +10,17 @@ fun Blockchain.newBlock(block :Block):Blockchain{
 }
 
 
+
 /** Returns empty if it's valid, otherwise the reason that it's invalid */
 fun Blockchain.isValid(): Optional<String> {
     for(i in 1 until blocks.size){
         val block = blocks[i]
-        val hash = block.hash()
+        val hash = block.hash
         if(!hash.isValid())
             return Optional.of("Block hash is not correct")
         val old = blocks[i - 1]
-        if(block.lasthash != old.hash())
-            return Optional.of("Block lasthash is incorrect\nNeeded ${old.hash()}, got ${block.lasthash}")
+        if(block.lasthash != old.hash)
+            return Optional.of("Block lasthash is incorrect\nNeeded ${old.hash}, got ${block.lasthash}")
         val sig = Signature.fromBase64(block.signature)
         val user = this.users.firstOrNull { it.id == block.author } ?: return Optional.of("Can't find user on the blockchain")
         val valid = Person.verify(user.person,sig,hash.toByteArray(Charset.forName("UTF-8")))

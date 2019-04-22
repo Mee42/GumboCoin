@@ -263,6 +263,9 @@ class Person private constructor(
     }
 
     fun justPublic() = fromPublicKey(publicKey)
+    fun publicKeyBase64(): String {
+        return Base64.encodeBase64String(publicKey.encoded)
+    }
 
 
 }

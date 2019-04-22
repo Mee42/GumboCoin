@@ -7,7 +7,6 @@ import mu.KotlinLogging
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
-import java.util.*
 
 const val diff = 2L
 
@@ -22,7 +21,7 @@ var blockchain :Blockchain =
 private fun block(sig :String):Block{
     return Block(
         author = "server",
-        actions = listOf(SignUpAction(clientID = "miner",publicKey = Base64.getEncoder().encodeToString(KeyManager.miner.publicKey.encoded))),
+        actions = listOf(SignUpAction(clientID = "miner",publicKey = KeyManager.miner.publicKeyBase64())),
         timestamp = System.currentTimeMillis(),
         nonce = 0,
         difficulty = diff,
@@ -33,6 +32,7 @@ private fun block(sig :String):Block{
 val dataCache :MutableList<Action> = mutableListOf()
 
 fun addToDataCache(action :Action){
+    logger.info("Logging action: ${serialize(action)}")
     dataCache.add(action)
     sendUpdates()
 }
@@ -45,7 +45,7 @@ fun sendUpdates(){
         .onNext(ActionUpdate(
             actions = dataCache,
             difficulty = diff,
-            lasthash = blockchain.blocks.last().hash()
+            lasthash = blockchain.blocks.last().hash
         ))
 }
 
@@ -61,6 +61,7 @@ fun main() {
         .start()!!
 
     logger.info("Network initialized")
+    logger.info("blockchain:" + serialize(blockchain))
 
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()

@@ -85,6 +85,7 @@ fun RSocket.requestStream(req : Request.Stream, data: Sendable) : Flux<ByteArray
 fun RSocket.requestResponse(req : Request.Response, data : Sendable) : Mono<ByteArray> =
     Mono.fromCallable { DataBlob(req.intent, data.send()) }
         .map { gson.toJson(it) }
+        .map { logger.info(it);it }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
             clientID = clientID,

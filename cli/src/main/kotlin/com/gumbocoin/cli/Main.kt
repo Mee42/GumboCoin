@@ -41,12 +41,11 @@ fun main() {
 
 
     time("To register") {
-        socket.requestResponse(Request.Response.SIGN_UP, SignUpAction(clientID ,Base64.getEncoder().encodeToString(me.publicKey.encoded)))
+        socket.requestResponse(Request.Response.SIGN_UP, SignUpAction(clientID,me.publicKeyBase64()))
             .mapFromSendable<Status>()
             .map { log(it,"Registered successfully") }
             .block()
     }
-
 
     time("To mine a block") {
         var updates = Optional.empty<ActionUpdate>()

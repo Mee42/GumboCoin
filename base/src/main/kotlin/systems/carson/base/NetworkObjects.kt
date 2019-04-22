@@ -1,10 +1,10 @@
 package systems.carson.base
 
-import com.google.gson.Gson
-import com.google.gson.GsonBuilder
+import com.google.gson.*
 import io.rsocket.Payload
 import io.rsocket.util.DefaultPayload
 import org.apache.commons.codec.binary.Base64
+import java.lang.reflect.Type
 import java.util.*
 
 
@@ -12,6 +12,19 @@ const val PORT = 48626
 
 val gson : Gson = GsonBuilder()
     .setLenient()
+    .registerTypeAdapter(Action::class.java,object :JsonDeserializer<Action> {
+        override fun deserialize(json: JsonElement?, typeOfT: Type?, context: JsonDeserializationContext?): Action? {
+            if(json == null)
+                return null
+            when(ActionType.valueOf((json.asJsonObject.get("type").asString))) {
+                ActionType.SIGN_UP -> {
+                    return SignUpAction(
+                        json.asJsonObject.getAsJsonPrimitive("clientID").asString,
+                        json.asJsonObject.getAsJsonPrimitive("publicKey").asString)
+                }//TODO rework everything from DataBlob up. It's fucked, and I hate it.
+            }
+        }
+    })
     .create()
 
 
@@ -31,16 +44,7 @@ class StreamDataBlob(
     val data :ReceivedData,
     val isVerified :Boolean)
 
-//class FireDataBlob(
-//    val intent :Request.Fire,
-//    val clientID :String,
-//    val data :ReceivedData,
-//    val isVerified :Boolean)
-
 class ReceivedData(val data :String){
-    fun base64() :ByteArray{
-        return Base64.decodeBase64(data)
-    }
     inline fun <reified T :Sendable> fromJson() :T{
         return gson.fromJson(data,T::class.java)
     }
