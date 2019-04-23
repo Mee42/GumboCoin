@@ -21,22 +21,14 @@ fun Mono<Status>.printStatus(message :String = "", loggger : KLogger = logger): 
         it.extraData
             .takeIf { w -> w.isNotBlank() }
             ?.let { w -> loggger.warn("extra data    : $w") }
+    }else{
+        logger.info(message)
     }
     it
 }
 
 fun Flux<Status>.printStatus(message :String = "", loggger : KLogger = logger): Flux<Status> = this.map {
-    if(it.failed){
-        message
-            .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn(w) }
-        it.errorMessage
-            .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn("error message : $w") }
-        it.extraData
-            .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn("extra data    : $w") }
-    }
+    Mono.just(it).printStatus(message,loggger)
     it
 }
 fun String.trimAESPadding():String{
@@ -48,10 +40,6 @@ fun String.trimAESPadding():String{
 
 
 
-inline fun <reified T:Sendable> Flux<ByteArray>.mapFromSendable():Flux<T> = map { it.toString(Charset.forName("UTF-8")) }.map { Sendable.deserialize<T>(it) }
-inline fun <reified T:Sendable> Mono<ByteArray>.mapFromSendable():Mono<T> = map { it.toString(Charset.forName("UTF-8")) }.map { Sendable.deserialize<T>(it) }
-
-
 fun Flux<ByteArray>.stringValues() : Flux<String> = map { it.toString(Charset.forName("UTF-8")) }
 fun Mono<ByteArray>.stringValues() : Mono<String> = map { it.toString(Charset.forName("UTF-8")) }
 
@@ -60,8 +48,8 @@ fun Flux<String>.println() : Flux<String> = map { response.info(it);it }
 fun Mono<String>.println() : Mono<String> = map { response.info(it);it }
 
 
-fun RSocket.requestStream(req : Request.Stream, data: Sendable) : Flux<ByteArray> =
-    Mono.fromCallable { DataBlob(req.intent,data.send()) }
+fun RSocket.requestStream(data: RequestDataBlob) : Flux<String> =
+    Mono.just(data)
         .map { gson.toJson(it) }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
@@ -78,12 +66,13 @@ fun RSocket.requestStream(req : Request.Stream, data: Sendable) : Flux<ByteArray
         .map { it.toBytes() }
         .map { me.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
+        .map { it.toString(Charset.forName("UTF-8")) }
 
 
 
 
-fun RSocket.requestResponse(req : Request.Response, data : Sendable) : Mono<ByteArray> =
-    Mono.fromCallable { DataBlob(req.intent, data.send()) }
+fun RSocket.requestResponse(data :RequestDataBlob) : Mono<String> =
+    Mono.just(data)
         .map { gson.toJson(it) }
         .map { logger.info(it);it }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
@@ -94,7 +83,7 @@ fun RSocket.requestResponse(req : Request.Response, data : Sendable) : Mono<Byte
         ) }
         .map { message: Message -> gson.toJson(message) }
         .map { logger.debug("Making request: $it");it }
-        .map { it.toByteArray(Charset.forName("UTF-8")) }
+        .map { it.toByteArray(Charset.forName("UTF-8")) }//make sure it's UTF-8, don't trust library
         .map { DefaultPayload.create(it) }
         .flatMap { requestResponse(it) }
         .map { it.dataUtf8 }
@@ -103,4 +92,5 @@ fun RSocket.requestResponse(req : Request.Response, data : Sendable) : Mono<Byte
         .map { it.toBytes() }
         .map { me.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
+        .map { it.toString(Charset.forName("UTF-8")) }
 

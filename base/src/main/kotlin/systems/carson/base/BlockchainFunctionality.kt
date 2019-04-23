@@ -23,7 +23,7 @@ fun Blockchain.isValid(): Optional<String> {
             return Optional.of("Block lasthash is incorrect\nNeeded ${old.hash}, got ${block.lasthash}")
         val sig = Signature.fromBase64(block.signature)
         val user = this.users.firstOrNull { it.id == block.author } ?: return Optional.of("Can't find user on the blockchain")
-        val valid = Person.verify(user.person,sig,hash.toByteArray(Charset.forName("UTF-8")))
+        val valid = Person.verify(user.person,sig,block.excludeSignature().toByteArray(Charset.forName("UTF-8")))
         // make sure it's signed properly.
         // The user needs to be on the blockchain because we need both the public key and the signature to verify it
         if(!valid)
@@ -40,14 +40,14 @@ fun String.isValid():Boolean{
 }
 
 fun Block.excludeSignature():String{
-    data class B(
+    data class BlockWithNoSignature(
         val author: String,
         val actions: List<Action>,
         val timestamp: Long,
         val nonce: Long,
         val difficulty: Long,
         val lasthash: String)
-    val b = B(
+    val b = BlockWithNoSignature(
         author,
         actions,
         timestamp,

@@ -43,8 +43,8 @@ operator fun <T1,T2,T3,T4> Tuple4<T1, T2, T3, T4>.component4():T4{
 
 val networkLogger = KotlinLogging.logger {}
 
-private fun Mono<Tuple2<Payload,String>>.encryptBackToPerson():Mono<Payload> =
-    map { (payload, clientID) ->
+private fun Mono<Tuple2<String,Payload>>.encryptBackToPerson():Mono<Payload> =
+    map { (clientID, payload ) ->
         Tuples.of(if(payload.hasMetadata()) payload.metadataUtf8 else "",payload.data.array(),clientID) }
 
         .map { tuple ->
@@ -66,48 +66,49 @@ private fun Mono<Tuple2<Payload,String>>.encryptBackToPerson():Mono<Payload> =
             else
                 DefaultPayload.create(data,Charset.forName("UTF-8"),meta,Charset.forName("UTF-8"))
         }
+private fun Flux<Tuple2<String,Payload>>.encryptBackToPerson() :Flux<Payload> =
+        map { tuple -> Mono.just(tuple) }
+            .flatMap { it.encryptBackToPerson() }
+//            .flatMap/ { it }
 
+fun getResponseHandler(requestDataBlob: RequestDataBlob):(RequestDataBlob) -> Payload{
+    return ResponseHandler.values()
+        .firstOrNull { it.request == Request.Response.values().first { w -> w.intent == requestDataBlob.intent } }
+        ?.handler ?: error("Can't handle $requestDataBlob")
+}
+fun getStreamHandler(requestDataBlob: RequestDataBlob):(RequestDataBlob) -> Flux<Payload>{
+    return StreamHandler.values()
+        .firstOrNull { it.request == Request.Stream.values().first { w -> w.intent == requestDataBlob.intent } }
+        ?.handler ?: error("Can't handle $requestDataBlob")
+}
 
-private fun Flux<Tuple2<Payload,String>>.encryptBackToPerson():Flux<Payload> = flatMap { Mono.just(it).encryptBackToPerson() }//I hate myself but how
 
 class MasterHandler :SocketAcceptor {
     override fun accept(setup: ConnectionSetupPayload?, sendingSocket: RSocket?): Mono<RSocket> {
         return Mono.just(object :AbstractRSocket(){
-            override fun requestResponse(payload: Payload?): Mono<Payload> {
-                return Mono.just(payload!!)//TODO make null safe
-                    .map { it!! }
+            override fun requestResponse(payload: Payload): Mono<Payload> {
+                return Mono.just(payload)
                     .map { gson.fromJson(it.dataUtf8,Message::class.java) }
                     .map { message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
                     .map { (clientID, plaintextBlob, isValid) ->  Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
-                    .map { (clientID, blob, isValid) -> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
-                    .map { (clientID, blob, isValid) -> Tuples.of(RequestDataBlob(
-                        clientID = clientID,
-                        intent = Request.Response.values().first { value -> value.intent == blob.intent },// TODO("firstOrNull") ?: error("Can't find handler for intent ${blob.intent}"),
-                        data = ReceivedData(blob.data),
-                        isVerified = isValid
-                    ),clientID) }
-                    .map { networkLogger.info("request   :" + gson.toJson(it.t1));it }
-                    .map { (data, id) -> Tuples.of(getResponseHandler(data).invoke(data),id) }
+                    .map { (clientID, blob, isValid) -> Tuples.of(clientID,gson.fromJson(blob,RequestDataBlob::class.java),isValid) }
+                    .map { tuple -> tuple.t2.isVerified = tuple.t3;tuple }
+                    .map { (clientID, blob) -> Tuples.of(clientID,getResponseHandler(blob).invoke(blob)) }
+                    .map { itt -> networkLogger.info("Sending back:${itt.t2.dataUtf8}");itt}
                     .encryptBackToPerson()
-                    .map { itt -> networkLogger.debug("Sending back:${itt.dataUtf8}");itt}
 
             }
 
-            override fun requestStream(payload: Payload?): Flux<Payload> {
-                return Mono.just(payload!!)
-                    .map { it!! }
+            override fun requestStream(payload: Payload): Flux<Payload> {
+                return Mono.just(payload)
                     .map { pay :Payload -> gson.fromJson(pay.dataUtf8,Message::class.java) }
                     .map { message :Message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
                     .map { (clientID,plaintextBlob,isValid) -> Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
-                    .map { (clientID, blob,isValid)-> Tuples.of(clientID,gson.fromJson(blob,DataBlob::class.java),isValid) }
-                    .map { (clientID, blob, isValid)  -> Tuples.of(StreamDataBlob(
-                        clientID = clientID,
-                        intent = Request.Stream.values().first { value -> value.intent == blob.intent },// TODO("firstOrNull") ?: error("Can't find handler for intent ${blob.intent}"),
-                        data = ReceivedData(blob.data),
-                        isVerified = isValid
-                    ),clientID) }
-                    .map { networkLogger.info("stream    :" + gson.toJson(it.t1));it }
-                    .flatMapMany { (blob: StreamDataBlob, clientID :String) -> getStreamHandler(blob).invoke(blob).map { Tuples.of(it,clientID) } }
+                    .map { networkLogger.info("stream    :" + it.t2);it }
+                    .map { (clientID, blob,isValid)-> Tuples.of(clientID,gson.fromJson(blob,RequestDataBlob::class.java),isValid) }
+                    .map { it.t2.isVerified = it.t3;Tuples.of(it.t1,it.t2) }
+                    .flatMapMany { (clientID, blob) -> getStreamHandler(blob).invoke(blob).map { Tuples.of(clientID,it) } }
+//                    .map { itt -> itt }
                     .encryptBackToPerson()
             }
         })

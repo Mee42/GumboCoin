@@ -7,84 +7,63 @@ import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.nio.charset.Charset
 
-private fun Flux<String>.toPayloads(): Flux<Payload> = this.map { it.toPayload() }
+enum class StreamHandler(
+    val request :Request.Stream,
+    val handler :(RequestDataBlob) -> Flux<Payload>){
+    NUMBERS(Request.Stream.NUMBERS,req@{pay ->
+        pay as IntDataBlob
+        return@req Flux.range(0,pay.value).map { "" + it }.map { it.toPayload() }
+    }),
+    BLOCKCHAIN_UPDATES(Request.Stream.BLOCKCHAIN_UPDATES, req@ {
+        println("dataCache: ${gson.toJson(dataCache)}")
+        val value = ActionUpdate(dataCache, blockchain.blocks.last().hash,diff)
+        println("Value: ${gson.toJson(value)}")
+//        updateSource.toFlux().startWith(value)
+//            .map { println("Sending out ${gson.toJson(it)}");it }
+//            .map { it.toPayload() }
+        Flux.just(value)
+            .map { println("Sending out ${gson.toJson(it)}");it }
+            .map { it.toPayload() }
+    })
+}
 
-//
-//val streamsThatDontNeedVerification =
-//    listOf(
-//        Request.Stream.NUMBERS,
-//        Request.Stream.BLOCKCHAIN_UPDATES
-//    )
-////TODO implement this in Network.kt
-//val requestsThatDontNeedVerification =
-//        listOf(
-//            Request.Response.PING,
-//            Request.Response.DECRYPT,
-//            Request.Response.VERIFIED,
-//            Request.Response.SIGN_UP
-//            )//TODO
+enum class ResponseHandler(
+    val request :Request.Response,
+    val handler :(RequestDataBlob) -> Payload){
+    PING(Request.Response.PING,req@ { "pong".toPayload() }),
+    DECRYPT(Request.Response.DECRYPT,req@ {pay ->
+        pay as EncryptedDataBlob
+        val plain = KeyManager.server.decryptAES(pay.data.toBytes())
+        "${pay.clientID}:\"${plain.toString(Charset.forName("UTF-8"))}\"".toPayload()
+    }),
+    SIGN_UP(Request.Response.SIGN_UP,req@ {pay ->
+        pay as SignUpDataBlob
 
-fun getStreamHandler(payloadInitial: StreamDataBlob): (StreamDataBlob) -> Flux<Payload> =
-    when (payloadInitial.intent) {
-        Request.Stream.NUMBERS -> { pay ->
-            Mono.fromCallable { pay.data.fromJson<SendableInteger>().value }
-                .filter { it != null }
-                .map { it!! }
-                .flatMapMany { count -> Flux.range(0, count) }
-                .map { it.toString() }
-                .toPayloads()
+        if (blockchain.users.any { it.id == pay.clientID })
+            return@req Status(failed = true, errorMessage = "User already exists").toPayload()
+        addToDataCache(pay.signUpAction)
+        Status().toPayload()
+    }),
+    VERIFIED(Request.Response.VERIFIED,req@ {pay ->
+        return@req SendableBoolean(pay.isVerified).toPayload()
+    }),
+    BLOCK(Request.Response.BLOCK, req@ { pay ->
+        pay as BlockDataBlob
+        val block = pay.block
+        println("got block:$block")
+        if(!block.hash.isValid())
+            return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
+        val newBlockchain = blockchain.newBlock(block)
+        val valid = newBlockchain.isValid()
+        if(valid.isPresent) {
+            return@req Status(
+                failed = true,
+                errorMessage = "Block is invalid when added to the blockchain",
+                extraData = valid.get()
+            ).toPayload()
         }
-        Request.Stream.BLOCKCHAIN_UPDATES -> { _ ->
-            val value = ActionUpdate(dataCache, blockchain.blocks.last().hash,diff)
-            updateSource.toFlux().startWith(value).map(ActionUpdate::toPayload)
-        }
-
-    }
-
-fun getResponseHandler(payloadInitial: RequestDataBlob): (RequestDataBlob) -> Payload =
-    when (payloadInitial.intent) {
-
-        Request.Response.PING -> { _ -> "pong".toPayload() }
-        Request.Response.DECRYPT -> { pay ->
-            val plain = KeyManager.server.decryptAES(pay.data.fromJson<EncryptedString>().toBytes())
-            "${pay.clientID}:\"${plain.toString(Charset.forName("UTF-8"))}\"".toPayload()
-        }
-        Request.Response.VERIFIED -> { pay -> SendableBoolean(pay.isVerified).send().toPayload() }
-        Request.Response.SIGN_UP -> req@{ pay ->
-            val action = pay.data.fromJson<Action>()
-            if(action.type != ActionType.SIGN_UP)
-                error("Can't signup if the type is not SIGN_UP")
-            val signup = Sendable.deserialize<SignUpData>(action.data)
-
-
-            if (blockchain.users.any { it.id == signup.clientID })
-                return@req Status(failed = true, errorMessage = "User already exists").toPayload()
-
-
-            addToDataCache(SignUpAction(signup.clientID,signup.publicKey))
-            return@req Status().toPayload()
-
-
-        }
-        Request.Response.BLOCK -> req@ { pay ->
-            if(pay.isVerified)
-                return@req Status(failed = true, errorMessage = "Not verified").toPayload()//TODO move into Network.kt
-            val block = pay.data.fromJson<Block>()
-            println("got block:$block")
-            if(!block.hash.isValid())
-                return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
-            val newBlockchain = blockchain.newBlock(block)
-            val valid = newBlockchain.isValid()
-            if(valid.isPresent) {
-                return@req Status(
-                    failed = true,
-                    errorMessage = "Block is invalid when added to the blockchain",
-                    extraData = valid.get()
-                ).toPayload()
-            }
-            blockchain = newBlockchain
-            clearDataCache()
-            Status().toPayload()
-        }
-
-    }
+        blockchain = newBlockchain
+        clearDataCache()
+        Status().toPayload()
+    })
+}
