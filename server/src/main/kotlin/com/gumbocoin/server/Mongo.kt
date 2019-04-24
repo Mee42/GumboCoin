@@ -18,7 +18,7 @@ fun main() {
        .deleteMany(Filters.exists("number"))
        .toMono()
        .block()
-       .let { println(it) }
+//       .let { println(it) }
 }
 
 private fun mapDoc(vararg map :Pair<String,Any>):Document{

@@ -24,7 +24,7 @@ object KeyManager {
         if(!person.exists())
             error("Can't find server key")
         val text = person.readText(Charset.forName("UTF-8"))
-        return Person.deserialize(text)
+        return Person.fromKeyFile(text)
     }
 
 

@@ -3,20 +3,18 @@ package com.gumbocoin.server
 
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
-import mu.KotlinLogging
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
 
 const val diff = 2L
 
-private val logger by lazy { KotlinLogging.logger {} }
-
 var blockchain :Blockchain =
     Blockchain(listOf(block(
         KeyManager.server.sign(block(Signature.VOID.toBase64()).hash.toByteArray(Charset.forName("UTF-8"))).toBase64()
     )))
 
+val logger = GLogger.logger()
 
 private fun block(sig :String):Block{
     return Block(
@@ -53,7 +51,7 @@ val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionU
 
 
 fun main() {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "INFO")
+    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
 
     val closable = RSocketFactory.receive()
         .acceptor(MasterHandler())

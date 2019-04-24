@@ -3,13 +3,11 @@ package systems.carson.base
 class Blockchain(val blocks: List<Block>)  {
 
     val users: List<User>
-        get() = emptyList()//TODO even more todo :(
-
-//            .flatMap { it.actions }//TODO this alwaus fucks up on reqorks
-//            .filter { it.type == ActionType.SIGN_UP }
-//            .map { Sendable.deserialize<SignUpData>(it.data) }
-//            .map { TODO("Seed NetworkObjects ln24") }
-//            .map { User(it.clientID,Person.deserialize(it.publicKey)) }
+        get() = blocks
+            .flatMap { it.actions }
+            .filter { it.type == ActionType.SIGN_UP }
+            .map { it as SignUpAction }
+            .map { User(it.clientID,Person.fromPublicKey(it.publicKey)) }
 }
 
 class User(

@@ -2,16 +2,6 @@ import org.junit.jupiter.api.Test
 
 import EncryptionTests.Companion.privateBob
 import EncryptionTests.Companion.publicBob
-import EncryptionTests.Companion.privateBobRandom
-import EncryptionTests.Companion.publicBobRandom
-import EncryptionTests.Companion.privateEve
-import EncryptionTests.Companion.publicEve
-import EncryptionTests.Companion.privateEveRandom
-import EncryptionTests.Companion.publicEveRandom
-import EncryptionTests.Companion.privateAlice
-import EncryptionTests.Companion.publicAlice
-import EncryptionTests.Companion.privateAliceRandom
-import EncryptionTests.Companion.publicAliceRandom
 import org.junit.jupiter.api.Assertions.assertEquals
 import systems.carson.base.Person
 
@@ -22,7 +12,7 @@ internal class Serialization {
         val person = privateBob()
         val serialized = person.serialize()
         //println(serialized)
-        val new = Person.deserialize(serialized)
+        val new = Person.fromKeyFile(serialized)
         assertEquals(person,new)
 
     }
@@ -31,7 +21,7 @@ internal class Serialization {
         val person = publicBob()
         val serialized = person.serialize()
 //        println(serialized)
-        val new = Person.deserialize(serialized)
+        val new = Person.fromKeyFile(serialized)
         assertEquals(person,new)
     }
     //TODO FIGURE OUT HOW TO GET PUBLIC KEY

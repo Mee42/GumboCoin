@@ -1,80 +1,12 @@
 package systems.carson.base
 
-import com.google.gson.*
-import com.google.gson.reflect.TypeToken
-import com.sun.jmx.remote.internal.ClientListenerInfo
 import io.rsocket.Payload
 import io.rsocket.util.DefaultPayload
-import org.apache.commons.codec.binary.Base64
-import java.lang.reflect.Type
-import java.lang.reflect.TypeVariable
-import java.util.*
 
 
 const val PORT = 48626
 
-val gson :Gson = GsonBuilder()
-    .registerTypeAdapter(Action::class.java,object :JsonDeserializer<Action> {
-        override fun deserialize(json: JsonElement, typeOfT: Type?, context: JsonDeserializationContext): Action? {
-            val obj = json.asJsonObject
-
-            return when(ActionType.valueOf((obj.get("type").asString))) {
-                ActionType.SIGN_UP -> {
-                    SignUpAction(
-                        clientID = obj.getAsJsonPrimitive("clientID").asString,
-                        publicKey = obj.getAsJsonPrimitive("publicKey").asString
-                    )
-                }
-            }
-        }
-    })
-    .registerTypeAdapter(RequestDataBlob::class.java,object :JsonDeserializer<RequestDataBlob> {
-
-        override fun deserialize(json: JsonElement?, typeOfT: Type?, context: JsonDeserializationContext): RequestDataBlob? {
-            if(json == null)
-                return null
-            val obj = json.asJsonObject
-
-            val clientID :String = obj.getAsJsonPrimitive("clientID").asString
-            val intent :String = obj.getAsJsonPrimitive("intent").asString
-
-            return when(RequestDataBlobType.valueOf(obj.getAsJsonPrimitive("type").asString)){
-                RequestDataBlobType.SIGN_UP_DATA -> SignUpDataBlob(
-                    clientID = clientID,
-                    signUpAction = context.deserialize(obj.getAsJsonObject("signUpAction"), SignUpAction::class.java)
-                )
-                RequestDataBlobType.ENCRYPTED_DATA -> EncryptedDataBlob(
-                    clientID = clientID,
-                    data = context.deserialize(obj.getAsJsonObject("data"),EncryptedString::class.java),
-                    intent = intent
-                )
-                RequestDataBlobType.BLOCK_DATA -> BlockDataBlob(
-                    clientID = clientID,
-                    block = context.deserialize(obj.getAsJsonObject("block"),Block::class.java),
-                    intent = intent
-                )
-                RequestDataBlobType.STRING_DATA -> StringDataBlob(
-                    clientID = clientID,
-                    value = obj.getAsJsonPrimitive("value").asString,
-                    intent = intent
-                )
-                RequestDataBlobType.INT_DATA -> IntDataBlob(
-                    clientID = clientID,
-                    value = obj.getAsJsonPrimitive("value").asInt,
-                    intent = intent
-                )
-                RequestDataBlobType.NORMAL -> RequestDataBlob(
-                    clientID = clientID,
-                    intent = intent)
-            }
-        }
-    })
-
-    .create()
-
-
 class Request{
-
     enum class Response(val intent :String){
         PING("ping"),
         DECRYPT("decrypt"),
@@ -118,7 +50,7 @@ class ActionUpdate(val actions :List<Action>,
 
 interface Sendable{
     fun send():String{
-        return gson.toJson(this)
+        return serialize(this)
     }
     fun toPayload():Payload{
         return DefaultPayload.create(send())
@@ -126,7 +58,15 @@ interface Sendable{
     companion object
 }
 
-inline fun <reified T :Sendable> Sendable.Companion.fromJson(str :String):T = gson.fromJson(str,T::class.java)
+
+fun String.trimAESPadding():String{
+    var i = this.lastIndex
+    while(i - 1 < length && this[i - 1] == (0).toChar())
+        i--
+    return this.substring(0,i)
+}
+
+inline fun <reified T :Sendable> Sendable.Companion.fromJson(str :String):T = deserialize(str.trimAESPadding())
 
 class SendableBoolean(val value :Boolean) :Sendable
 class SendableString(val value :String) :Sendable

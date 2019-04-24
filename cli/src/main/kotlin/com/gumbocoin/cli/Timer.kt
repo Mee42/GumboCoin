@@ -1,6 +1,7 @@
 package com.gumbocoin.cli
 
-import mu.KotlinLogging
+import systems.carson.base.GLogger
+import systems.carson.base.logger
 import java.time.Duration
 
 class Timer{
@@ -31,7 +32,7 @@ class Timer{
 
 
 fun <T> time(print :String, closure :() -> T):T{
-    val logger = KotlinLogging.logger("Time")
+    val logger = GLogger.logger("Time")
     val timer = Timer()
     timer.start()
     val t = closure()

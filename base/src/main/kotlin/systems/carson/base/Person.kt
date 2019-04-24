@@ -1,6 +1,5 @@
 package systems.carson.base
 
-import mu.KotlinLogging
 import org.apache.commons.codec.binary.Base64
 import org.apache.commons.codec.digest.DigestUtils
 import java.security.*
@@ -96,7 +95,7 @@ class Person private constructor(
         fun encryptRSA(data :ByteArray, person :Person):ByteArray = encryptRSA(data,person.publicKey)
 
 
-        fun deserialize(string :String):Person{
+        fun fromKeyFile(string :String):Person{
             var private :PrivateKey? = null
             var public :PublicKey? = null
             if(string.contains(START_PRIVATE)){
@@ -144,7 +143,7 @@ class Person private constructor(
         fun fromPublicKey(publicKey: PublicKey):Person = Person(KeyPair(publicKey,null))
         /** Takes Base64 */
         fun fromPublicKey(string :String):Person {
-            println(string)
+//            println(string)
             return fromPublicKey(pub(string))
         }
         fun fromPrivateKey(privateKey: PrivateKey):Person {

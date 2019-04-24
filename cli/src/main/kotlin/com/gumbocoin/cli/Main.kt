@@ -1,32 +1,29 @@
 package com.gumbocoin.cli
 
+import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
-import mu.KotlinLogging
+import reactor.core.publisher.DirectProcessor
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
+import reactor.core.publisher.toFlux
+import reactor.util.function.Tuple2
+import reactor.util.function.Tuples
 import systems.carson.base.*
 import java.nio.charset.Charset
 import java.util.*
 import kotlin.concurrent.thread
+import java.util.ArrayList
+import java.util.Collections.synchronizedList
 
 
-val logger = KotlinLogging.logger { }
-val response = KotlinLogging.logger("Response")
+val logger = GLogger.logger()
+
+val network = GLogger.logger("Network")
+
 
 val me = Person.generateNew()
 val clientID = UUID.randomUUID().toString().split("-")[0]
-
-fun log(s :Status, success :String){
-    if(s.failed){
-        s.errorMessage.takeIf { it.isNotBlank() }
-            ?.let { logger.warn(it) }
-        s.extraData.takeIf { it.isNotBlank() }
-            ?.let { logger.warn(it) }
-    }else{
-        logger.info(success)
-    }
-}
 
 class MutableBlock(
     var author: String,
@@ -36,8 +33,8 @@ class MutableBlock(
     var difficulty: Long,
     var lasthash: String,
     var signature: String
-){
-    fun toBlock():Block{
+) {
+    fun toBlock(): Block {
         return Block(
             author = author,
             actions = actions,
@@ -45,87 +42,148 @@ class MutableBlock(
             nonce = nonce,
             difficulty = difficulty,
             lasthash = lasthash,
-            signature = signature)
+            signature = signature
+        )
     }
-    constructor(b :Block): this(
+
+    constructor(b: Block) : this(
         author = b.author,
         actions = b.actions,
         timestamp = b.timestamp,
         nonce = b.nonce,
         difficulty = b.difficulty,
         lasthash = b.lasthash,
-        signature = b.signature)
+        signature = b.signature
+    )
+
     fun hash() = this.toBlock().hash()
 }
 
-inline fun <reified T> Mono<String>.mapFromJson():Mono<T> = map { it.trimAESPadding() }
-        .map {
-//    println("value: $it")
-    gson.fromJson(it,T::class.java)
-}
+inline fun <reified T> Mono<String>.mapFromJson(): Mono<T> = map { it.trimAESPadding() }
+    .map { deserialize<T>(it) }
 
 fun main() {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "INFO")
+    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
+    logger.printInfo()
+    network.printWarnings()
 
-    val socket = time("RSocket created") {
-        RSocketFactory.connect()
-            .transport(TcpClientTransport.create("localhost", PORT))
-            .start()
-            .block()!!
+
+    val socket = RSocketFactory.connect()
+        .transport(TcpClientTransport.create("localhost", PORT))
+        .start()
+        .block()!!
+
+    (0..2).forEach {
+        time("Ping-$it") { socket.requestResponse(RequestDataBlob(Request.Response.PING, clientID)).block() }
     }
 
-    time("Ping") { socket.requestResponse(RequestDataBlob(Request.Response.PING, clientID)).block() }
+    socket.requestResponse(SignUpDataBlob(clientID, me.publicKeyBase64()))
+        .mapFromJson<Status>()
+        .printStatus("Registered successfully")
+        .block()
+
+    val threadedMiner = ThreadedMiner(socket,GLogger.logger("Miner"))
+
+    socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID))
+        .map { Sendable.fromJson<ActionUpdate>(it) }
+        .map {
+            threadedMiner.update(
+                Update(
+                    Block(
+                        author = clientID,
+                        actions = it.actions,
+                        timestamp = System.currentTimeMillis(),
+                        nonce = Random().nextLong(),
+                        difficulty = it.difficulty,
+                        lasthash = it.lasthash,
+                        signature = ""
+                    )
+                )
+            )
+        }.subscribe()
+
+    threadedMiner.start()
+
+    threadedMiner
+        .toFlux()
+        .take(10)
+        .index { index, tuple2 -> Tuples.of(index,tuple2.t1,tuple2.t2) }
+        .map { println("Block!-${it.t1}") }
+        .blockLast()
+
+    threadedMiner.exit()
+}
+
+class Update(val newBlock: Block)
+class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = GLogger.logger(), sleep: Long = 100) {
 
 
-    time("To register") {
-        socket.requestResponse(SignUpDataBlob(clientID,me.publicKeyBase64()))
-            .mapFromJson<Status>()
-            .printStatus("Registered successfully")
-            .block()
+    private var running = false
+    private val update = synchronizedList(mutableListOf<Update>())
+    private var exit = false
+    private var sleepLength = sleep
+
+    fun start() {
+        running = true
     }
-    var updates = Optional.empty<ActionUpdate>()
-    thread(start = true) {
-        Thread.sleep(100)
-        socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES,clientID))
-            .println()
-            .map { Sendable.fromJson<ActionUpdate>(it) }
-            .subscribe {
-                updates = Optional.of(it)
-            println(it.lasthash)
+
+    fun exit() {
+        running = false; exit = true
+    }
+
+    fun update(u: Update) = update.add(u)
+
+    private val hot = DirectProcessor.create<Tuple2<Block, Status>>()
+
+    fun toFlux(): Flux<Tuple2<Block, Status>> {
+        return hot.toFlux()
+    }
+
+    init {
+        thread(start = true) {
+            var block: MutableBlock? = null
+            root@ while (true) {
+                if (exit) {
+//                    println("exiting")
+                    break@root
+                }
+                if (!running) {
+//                    println("not running :(")
+                    Thread.sleep(sleepLength)
+                    continue@root
+                }
+                if (update.isNotEmpty()) {
+//                    println("Updating block")
+                    block = MutableBlock(update.removeAt(0).newBlock)
+                }
+                val bblock = if(block == null) { logger.debug("Block is null");continue@root }else{ block }
+                val hash = bblock.hash()
+                if (hash.isValid()) {
+//                    println("Found valid hash: $hash")
+                    bblock.signature =
+                        me.sign(bblock.toBlock().excludeSignature().toByteArray(Charset.forName("UTF-8"))).toBase64()
+                    val realBlock = bblock.toBlock()
+
+                    socket.requestResponse(
+                        BlockDataBlob(
+                            block = realBlock,
+                            clientID = clientID,
+                            intent = Request.Response.BLOCK.intent
+                        )
+                    )
+                        .map { Sendable.fromJson<Status>(it) }
+                        .printStatus("Block accepted successfully!",loggger,debugSuccess = true)
+                        .map { hot.onNext(Tuples.of(realBlock, it)) }
+                        .block()
+//                    println("BLock accepted block done")
+                } else {
+                    bblock.nonce++
+//                    println("Invalid hash:$hash")
+                }
             }
-    }
-
-    var block :MutableBlock? = null
-
-    while(!updates.isPresent);
-
-    while(true){
-        if(updates.isPresent){
-            val u = updates.get()
-            block = MutableBlock(Block(
-                author = clientID,
-                actions = u.actions,
-                timestamp = System.currentTimeMillis(),
-                nonce = Random().nextLong(),
-                difficulty = u.difficulty,
-                lasthash = u.lasthash,
-                signature = Signature.VOID.toBase64()
-            ))
-        }
-        if(block == null){
-            println("block in null...")
-            continue
-        }
-        val hash = block.hash()
-        if(hash.isValid()){
-            block.signature = me.sign(block.toBlock().excludeSignature().toByteArray(Charset.forName("UTF-8"))).toBase64()
-            socket.requestResponse(BlockDataBlob(clientID,block.toBlock(),Request.Response.BLOCK.intent))
-                .mapFromJson<Status>()
-                .printStatus("Block accepted successfully!")
-                .block()
-        }else{
-            block.nonce++
         }
     }
+
+
 }
 

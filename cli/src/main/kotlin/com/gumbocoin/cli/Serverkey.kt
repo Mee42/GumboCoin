@@ -2,7 +2,7 @@ package com.gumbocoin.cli
 
 import systems.carson.base.Person
 
-val server = Person.deserialize("""
+val server = Person.fromKeyFile("""
 --- BEGIN PUBLIC KEY ---
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgWtrqoCVpKdnckYR7ulMmup2N/AoC+Rc+9RV
 J0l4Jo4NHsbEddyQ8QIZ+RGluGqENRs806tHB9xZ/klGJajZFtQ+dBE8tDuFN/GZ5qyI+KTe7eyIYmLg

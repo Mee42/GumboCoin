@@ -2,7 +2,6 @@ package com.gumbocoin.cli
 
 import io.rsocket.RSocket
 import io.rsocket.util.DefaultPayload
-import mu.KLogger
 import reactor.core.Exceptions
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
@@ -10,70 +9,58 @@ import systems.carson.base.*
 import java.nio.charset.Charset
 
 
-fun Mono<Status>.printStatus(message :String = "", loggger : KLogger = logger): Mono<Status> = this.map {
+fun Mono<Status>.printStatus(message :String = "", loggger : GLogger = GLogger.logger(), debugSuccess :Boolean = false): Mono<Status> = this.map {
     if(it.failed){
-        message
-            .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn(w) }
         it.errorMessage
             .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn("error message : $w") }
+            ?.let { w -> loggger.warning("error message : $w") }
         it.extraData
             .takeIf { w -> w.isNotBlank() }
-            ?.let { w -> loggger.warn("extra data    : $w") }
+            ?.let { w -> loggger.warning("extra data    : $w") }
     }else{
-        logger.info(message)
+        if(debugSuccess)
+            loggger.debug(message)
+        else
+            loggger.info(message)
     }
     it
 }
 
-fun Flux<Status>.printStatus(message :String = "", loggger : KLogger = logger): Flux<Status> = this.map {
+fun Flux<Status>.printStatus(message :String = "", loggger : GLogger = GLogger.logger()): Flux<Status> = this.map {
     Mono.just(it).printStatus(message,loggger)
     it
 }
-fun String.trimAESPadding():String{
-    var i = this.lastIndex
-    while(i - 1 < length && this[i - 1] == (0).toChar())
-        i--
-    return this.substring(0,i)
-}
-
-
-
-fun Flux<ByteArray>.stringValues() : Flux<String> = map { it.toString(Charset.forName("UTF-8")) }
-fun Mono<ByteArray>.stringValues() : Mono<String> = map { it.toString(Charset.forName("UTF-8")) }
-
-
-fun Flux<String>.println() : Flux<String> = map { response.info(it);it }
-fun Mono<String>.println() : Mono<String> = map { response.info(it);it }
 
 
 fun RSocket.requestStream(data: RequestDataBlob) : Flux<String> =
     Mono.just(data)
-        .map { gson.toJson(it) }
+        .map { serialize(it) }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
             clientID = clientID,
             encryptedData = encrypted.toStrings(),
             signature = me.sign(encrypted.concat()).toBase64()
         ) }
-        .map { message: Message -> gson.toJson(message) }
+        .map { message: Message -> serialize(message) }
+        .map { network.info("Making request: $it");it }
         .map { it.toByteArray(Charset.forName("UTF-8")) }
         .map { DefaultPayload.create(it) }
         .flatMapMany { requestStream(it) }
         .map { it.dataUtf8 }
-        .map { gson.fromJson(it, EncryptedString::class.java) }
+        .map { deserialize<EncryptedString>(it) }
         .map { it.toBytes() }
         .map { me.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
         .map { it.toString(Charset.forName("UTF-8")) }
+        .map { network.info("Got Stream Response: $it");it }
+
 
 
 
 
 fun RSocket.requestResponse(data :RequestDataBlob) : Mono<String> =
     Mono.just(data)
-        .map { gson.toJson(it) }
+        .map { serialize(it) }
         .map { logger.info(it);it }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
@@ -81,16 +68,18 @@ fun RSocket.requestResponse(data :RequestDataBlob) : Mono<String> =
             encryptedData = encrypted.toStrings(),
             signature = me.sign(encrypted.concat()).toBase64()
         ) }
-        .map { message: Message -> gson.toJson(message) }
-        .map { logger.debug("Making request: $it");it }
+        .map { message: Message -> serialize(message) }
+        .map { network.info("Making request: $it");it }
         .map { it.toByteArray(Charset.forName("UTF-8")) }//make sure it's UTF-8, don't trust library
         .map { DefaultPayload.create(it) }
         .flatMap { requestResponse(it) }
         .map { it.dataUtf8 }
         .map { logger.debug(it);it }
-        .map { gson.fromJson(it, EncryptedString::class.java) }
+        .map { deserialize<EncryptedString>(it) }
         .map { it.toBytes() }
         .map { me.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
         .map { it.toString(Charset.forName("UTF-8")) }
+        .map { network.info("Got Response: $it");it }
+
 

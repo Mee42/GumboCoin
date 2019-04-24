@@ -15,15 +15,15 @@ enum class StreamHandler(
         return@req Flux.range(0,pay.value).map { "" + it }.map { it.toPayload() }
     }),
     BLOCKCHAIN_UPDATES(Request.Stream.BLOCKCHAIN_UPDATES, req@ {
-        println("dataCache: ${gson.toJson(dataCache)}")
+//        println("dataCache: ${serialize(dataCache)}")
         val value = ActionUpdate(dataCache, blockchain.blocks.last().hash,diff)
-        println("Value: ${gson.toJson(value)}")
-//        updateSource.toFlux().startWith(value)
-//            .map { println("Sending out ${gson.toJson(it)}");it }
-//            .map { it.toPayload() }
-        Flux.just(value)
-            .map { println("Sending out ${gson.toJson(it)}");it }
+//        println("Value: ${serialize(value)}")
+        updateSource.toFlux().startWith(value)
+            .map { println("Sending out ${serialize(it)}");it }
             .map { it.toPayload() }
+//        Flux.just(value)
+//            .map { println("Sending out ${serialize(it)}");it }
+//            .map { it.toPayload() }
     })
 }
 
