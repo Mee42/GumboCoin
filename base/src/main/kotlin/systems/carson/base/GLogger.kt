@@ -17,11 +17,14 @@ interface GLogger {
 fun GLogger.Companion.logger():GLogger = Single.logger
 
 private object Single{
-    val logger by lazy { DefaultGLogger("%LEVEL%: %STR%") }
+    val logger by lazy { DefaultGLogger("%LEVEL%: $PAD%STR%") }
 }
 
 fun GLogger.Companion.logger(name :String):GLogger = LoggerWithName(name)
 
+
+private const val PAD = "%PAD_HERE%"
+private const val PAD_LENGTH = 15
 
 private open class DefaultGLogger(val builder :String) :GLogger{
 
@@ -33,15 +36,24 @@ private open class DefaultGLogger(val builder :String) :GLogger{
     }
     private var level :GLevel = GLevel.DEBUG
 
-    protected open fun getData():List<String> = emptyList()
+    protected open fun getData():Map<String,String> = emptyMap()
+    private fun getData(level :String):Map<String,String> = getData() + mapOf("level" to level)
 
-    private fun format(str :String,data :List<String> = getData()):String{
-        var retur = builder.replaceData("LEVEL",level.name)
-            .replaceData("STR",str)
-        data.forEachIndexed {index, strr ->
-            retur = retur.replaceData("data-$index",strr)
-        }
-        return retur
+
+
+    private fun format(str :String,data :Map<String,String>):String{
+        return (data + mapOf("str" to str)).toList()
+            .fold(builder) { a,b -> a.replaceData(b.first,b.second) }
+            .pad()
+    }
+
+    private fun String.pad():String{
+        return if(!this.contains(PAD))
+            this
+        else
+            this.substring(0,this.indexOf(PAD)).padEnd(PAD_LENGTH,' ') +
+                    this.substring(this.indexOf(PAD) + PAD.length)
+
     }
 
     private fun String.replaceData(name :String, value :String):String{
@@ -50,22 +62,22 @@ private open class DefaultGLogger(val builder :String) :GLogger{
 
     override fun debug(s: String) {
         if(level.level <= GLevel.DEBUG.level)
-            println(format(s))
+            println(format(s,getData("DEBUG")))
     }
 
     override fun warning(s: String) {
         if(level.level <= GLevel.WARNING.level)
-            System.err.println(format(s))
+            System.err.println(format(s,getData("WARN")))
     }
 
     override fun fatal(s: String) {
         if(level.level <= GLevel.FATAL.level)
-            System.err.println(format(s))
+            System.err.println(format(s,getData("FATAL")))
     }
 
     override fun info(s: String) {
         if(level.level <= GLevel.INFO.level)
-            System.err.println(format(s))
+            System.err.println(format(s,getData("INFO")))
     }
 
     override fun printDebug() {
@@ -85,6 +97,6 @@ private open class DefaultGLogger(val builder :String) :GLogger{
     }
 }
 
-private class LoggerWithName(val name :String) :DefaultGLogger("%LEVEL% - %DATA-0%: %STR%") {
-    override fun getData(): List<String> = listOf(name)
+private class LoggerWithName(val name :String) :DefaultGLogger("%LEVEL% - %NAME%: $PAD%STR%") {
+    override fun getData(): Map<String,String> = mapOf("name" to name) + super.getData()
 }
