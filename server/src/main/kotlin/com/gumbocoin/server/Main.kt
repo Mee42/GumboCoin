@@ -19,7 +19,7 @@ val logger = GLogger.logger()
 private fun block(sig :String):Block{
     return Block(
         author = "server",
-        actions = listOf(SignUpAction(clientID = "miner",publicKey = KeyManager.miner.publicKeyBase64())),
+        actions = listOf(),
         timestamp = System.currentTimeMillis(),
         nonce = 0,
         difficulty = diff,

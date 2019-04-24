@@ -28,8 +28,6 @@ object KeyManager {
     }
 
 
-    val miner : Person by lazy { get("miner.gc.key") }
-
     val server :Person by lazy { get("server.gc.key") }
 
 }

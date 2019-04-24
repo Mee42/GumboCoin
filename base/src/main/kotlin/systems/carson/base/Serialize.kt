@@ -9,24 +9,46 @@ fun serialize(obj :Any) :String{
     return GsonHolder.serializingGson.toJson(obj)
 }
 
+fun prettyPrint(obj :Any) :String {
+    return GsonHolder.prettySerializingGson.toJson(obj)
+}
+
 inline fun <reified T> deserialize(string :String) :T{
     return GsonHolder.deserializingGson.fromJson(string,T::class.java)
 }
 
+
 object GsonHolder{
-    val serializingGson :Gson = Gson()
-    val deserializingGson :Gson = GsonBuilder()
+    val serializingGson :Gson by lazy { serializingGsonProducer.invoke().create() }
+    val prettySerializingGson :Gson by lazy { serializingGsonProducer.invoke().setPrettyPrinting().create() }
+
+    val deserializingGson:Gson by lazy { deserializingGsonProducer.invoke().create() }
+
+
+
+    private val serializingGsonProducer :() -> GsonBuilder = { GsonBuilder() }
+    private val deserializingGsonProducer :() -> GsonBuilder = { GsonBuilder()
         .registerTypeAdapter(Action::class.java,object : JsonDeserializer<Action> {
             override fun deserialize(json: JsonElement, typeOfT: Type?, context: JsonDeserializationContext): Action? {
                 val obj = json.asJsonObject
 
+                fun str(s :String):String = obj.getAsJsonPrimitive(s).asString
+                fun int(s :String):Int = obj.getAsJsonPrimitive(s).asInt
+
+                val clientID :String = obj.getAsJsonPrimitive("clientID").asString
+
                 return when(ActionType.valueOf((obj.get("type").asString))) {
                     ActionType.SIGN_UP -> {
                         SignUpAction(
-                            clientID = obj.getAsJsonPrimitive("clientID").asString,
-                            publicKey = obj.getAsJsonPrimitive("publicKey").asString
+                            clientID = clientID,
+                            publicKey = str("publicKey")
                         )
                     }
+                    ActionType.TRANSACTION -> TransactionAction(
+                        clientID = clientID,
+                        recipientID = str("recipientID"),
+                        amount = int("amount"),
+                        signature = str("signature"))
                 }
             }
         })
@@ -36,6 +58,9 @@ object GsonHolder{
                 if(json == null)
                     return null
                 val obj = json.asJsonObject
+
+                fun str(s :String):String = obj.getAsJsonPrimitive(s).asString
+                fun int(s :String):Int = obj.getAsJsonPrimitive(s).asInt
 
                 val clientID :String = obj.getAsJsonPrimitive("clientID").asString
                 val intent :String = obj.getAsJsonPrimitive("intent").asString
@@ -57,20 +82,25 @@ object GsonHolder{
                     )
                     RequestDataBlobType.STRING_DATA -> StringDataBlob(
                         clientID = clientID,
-                        value = obj.getAsJsonPrimitive("value").asString,
+                        value = str("value"),
                         intent = intent
                     )
                     RequestDataBlobType.INT_DATA -> IntDataBlob(
                         clientID = clientID,
-                        value = obj.getAsJsonPrimitive("value").asInt,
+                        value = int("value"),
                         intent = intent
                     )
                     RequestDataBlobType.NORMAL -> RequestDataBlob(
                         clientID = clientID,
-                        intent = intent)
+                        intent = intent
+                    )
+                    RequestDataBlobType.TRANSACTION -> TransactionDataBlob(
+                        clientID = clientID,
+                        transactionAction = context.deserialize(obj.getAsJsonObject("transactionAction"),TransactionAction::class.java)
+                    )
                 }
             }
         })
-        .create()
+    }
 
 }

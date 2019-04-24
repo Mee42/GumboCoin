@@ -87,6 +87,7 @@ fun main() {
     socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID))
         .map { Sendable.fromJson<ActionUpdate>(it) }
         .map {
+            println("Updating: ${serialize(it.actions)}")
             threadedMiner.update(
                 Update(
                     Block(
@@ -111,6 +112,52 @@ fun main() {
         .map { println("Block!-${it.t1}") }
         .blockLast()
 
+    threadedMiner.stop()
+
+    socket.requestResponse(RequestDataBlob(
+        clientID = clientID,
+        intent = Request.Response.BLOCKCHAIN))
+        .map { Sendable.fromJson<Blockchain>(it) }
+        .map { println("blockchain:${prettyPrint(it)}") }
+        .block()
+
+    socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
+        .map { Sendable.fromJson<SendableInt>(it) }
+        .map { println("Money:${it.value}") }
+        .block()
+
+    socket.requestResponse(TransactionDataBlob(
+        clientID,
+        TransactionAction.sign(
+            clientID = clientID,
+            recipientID = "server",
+            amount = 5,
+            person = me)
+    ))
+        .map { Sendable.fromJson<Status>(it) }
+        .printStatus("Transaction successfull")
+        .block()
+
+    threadedMiner.start()
+
+    threadedMiner
+        .toFlux()
+        .take(1)
+        .index { index, tuple2 -> Tuples.of(index,tuple2.t1,tuple2.t2) }
+        .map { println("Block!-${it.t1}") }
+        .blockLast()
+
+    threadedMiner.stop()
+
+    socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
+        .map { Sendable.fromJson<SendableInt>(it) }
+        .map { println("Money:${it.value}") }
+        .block()
+
+    threadedMiner.stop()
+
+
+
     threadedMiner.exit()
 }
 
@@ -125,6 +172,11 @@ class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = 
 
     fun start() {
         running = true
+    }
+
+
+    fun stop(){
+        running = false
     }
 
     fun exit() {
@@ -153,7 +205,7 @@ class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = 
                     continue@root
                 }
                 if (update.isNotEmpty()) {
-//                    println("Updating block")
+                    println("Updating block")
                     block = MutableBlock(update.removeAt(0).newBlock)
                 }
                 val bblock = if(block == null) { logger.debug("Block is null");continue@root }else{ block }

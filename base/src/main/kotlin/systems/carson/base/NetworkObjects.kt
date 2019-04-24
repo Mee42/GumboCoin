@@ -2,23 +2,11 @@ package systems.carson.base
 
 import io.rsocket.Payload
 import io.rsocket.util.DefaultPayload
+import java.nio.charset.Charset
+import java.security.PublicKey
 
 
 const val PORT = 48626
-
-class Request{
-    enum class Response(val intent :String){
-        PING("ping"),
-        DECRYPT("decrypt"),
-        VERIFIED("verified"),
-        SIGN_UP("sign_up"),
-        BLOCK("block")
-    }
-    enum class Stream(val intent :String){
-        NUMBERS("numbers"),
-        BLOCKCHAIN_UPDATES("blockchain_updates")
-    }
-}
 
 open class RequestDataBlob(
     val intent :String,
@@ -30,14 +18,6 @@ open class RequestDataBlob(
 }
 
 
-enum class RequestDataBlobType{
-    NORMAL,
-    SIGN_UP_DATA,
-    ENCRYPTED_DATA,
-    BLOCK_DATA,
-    STRING_DATA,
-    INT_DATA
-}
 
 class Status(
     val failed :Boolean = false,
@@ -58,6 +38,16 @@ interface Sendable{
     companion object
 }
 
+
+enum class RequestDataBlobType{
+    NORMAL,
+    SIGN_UP_DATA,
+    ENCRYPTED_DATA,
+    BLOCK_DATA,
+    STRING_DATA,
+    INT_DATA,
+    TRANSACTION
+}
 
 fun String.trimAESPadding():String{
     var i = this.lastIndex
@@ -82,15 +72,29 @@ class EncryptedDataBlob(clientID :String, val data :EncryptedString, intent :Str
 class BlockDataBlob(clientID: String, val block :Block, intent :String) :RequestDataBlob(intent, clientID,RequestDataBlobType.BLOCK_DATA)
 class StringDataBlob(clientID :String, val value :String, intent :String) :RequestDataBlob(intent,clientID,RequestDataBlobType.STRING_DATA)
 class IntDataBlob(clientID :String, val value :Int, intent :String) :RequestDataBlob(intent,clientID,RequestDataBlobType.INT_DATA)
-
+class TransactionDataBlob(clientID: String, val transactionAction: TransactionAction) :RequestDataBlob(Request.Response.TRANSACTION,clientID,RequestDataBlobType.TRANSACTION)
 
 open class Action(val type: ActionType){
     companion object
 }
 
 class SignUpAction(val clientID :String,val publicKey :String) : Action(ActionType.SIGN_UP)
+class TransactionAction(val clientID :String, val recipientID: String, val amount :Int, val signature: String): Action(ActionType.TRANSACTION) {
+    fun isSignatureValid(publicKey: PublicKey): Boolean {
+        return Person.verify(publicKey,Signature.fromBase64(signature),(clientID + recipientID + amount).toByteArray(Charset.forName("UTF-8")))
+    }
+    companion object {
+        fun sign(clientID :String, recipientID: String,  amount :Int,person: Person): TransactionAction{
+            return TransactionAction(
+                clientID = clientID,
+                recipientID = recipientID,
+                amount = amount,
+                signature = person.sign((clientID + recipientID + amount).toByteArray(Charset.forName("UTF-8"))).toBase64())
+        }
+    }
+}
 
-enum class ActionType { SIGN_UP }
+enum class ActionType { SIGN_UP,TRANSACTION }
 
 
 class Message(

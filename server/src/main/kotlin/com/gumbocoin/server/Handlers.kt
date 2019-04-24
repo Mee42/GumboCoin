@@ -7,6 +7,8 @@ import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.nio.charset.Charset
 
+
+val handlerLogger = GLogger.logger("Handler")
 enum class StreamHandler(
     val request :Request.Stream,
     val handler :(RequestDataBlob) -> Flux<Payload>){
@@ -50,7 +52,7 @@ enum class ResponseHandler(
     BLOCK(Request.Response.BLOCK, req@ { pay ->
         pay as BlockDataBlob
         val block = pay.block
-        println("got block:$block")
+        handlerLogger.debug("got block:$block")
         if(!block.hash.isValid())
             return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
         val newBlockchain = blockchain.newBlock(block)
@@ -62,8 +64,29 @@ enum class ResponseHandler(
                 extraData = valid.get()
             ).toPayload()
         }
+        TODO("check data cache and make sure it matches")
+
         blockchain = newBlockchain
         clearDataCache()
         Status().toPayload()
+    }),
+    BLOCKCHAIN(Request.Response.BLOCKCHAIN, { blockchain.toPayload() }),
+    TRANSACTION(Request.Response.TRANSACTION, req@ {pay ->
+        if(!pay.isVerified)
+            return@req Status(failed = true,errorMessage =  "Unverified RequestDataBlob").toPayload()
+
+        pay as TransactionDataBlob
+
+        if (!blockchain.users.any { it.id == pay.clientID })
+            return@req Status(failed = true, errorMessage = "User does not exists").toPayload()
+        val user = blockchain.users.first { it.id == pay.clientID }
+        if(!pay.transactionAction.isSignatureValid(user.person.publicKey))
+            return@req Status(failed = true, errorMessage = "Signature on transactionAction is not valid").toPayload()
+        addToDataCache(pay.transactionAction)
+        Status().toPayload()
+    }),
+    MONEY(Request.Response.MONEY, { pay ->
+        pay as StringDataBlob
+        SendableInt(blockchain.amounts[pay.value] ?: 0).toPayload()
     })
 }
