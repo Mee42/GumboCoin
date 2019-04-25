@@ -55,6 +55,17 @@ enum class ResponseHandler(
         handlerLogger.debug("got block:$block")
         if(!block.hash.isValid())
             return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
+        if(dataCache != pay.block.actions){
+            return@req Status(
+                failed = true,
+                errorMessage = "Actions are invalid",
+                extraData = "Expected :$dataCache, got ${pay.block.actions}"
+            ).toPayload()
+        }
+        if(block.lasthash != blockchain.blocks.last().hash)
+            return@req Status(failed = true,
+                errorMessage = "lasthash is not correct",
+                extraData = "expected: ${blockchain.blocks.last().hash} and got ${block.lasthash}").toPayload()
         val newBlockchain = blockchain.newBlock(block)
         val valid = newBlockchain.isValid()
         if(valid.isPresent) {
@@ -64,7 +75,6 @@ enum class ResponseHandler(
                 extraData = valid.get()
             ).toPayload()
         }
-        TODO("check data cache and make sure it matches")
 
         blockchain = newBlockchain
         clearDataCache()
@@ -79,14 +89,56 @@ enum class ResponseHandler(
 
         if (!blockchain.users.any { it.id == pay.clientID })
             return@req Status(failed = true, errorMessage = "User does not exists").toPayload()
+
+        if(pay.clientID != pay.transactionAction.clientID)
+            return@req Status(failed = true, errorMessage = "Different clientID for the DataBlob object and the transaction object object",
+                extraData = pay.clientID + " verses " + pay.transactionAction.clientID).toPayload()
+
+
         val user = blockchain.users.first { it.id == pay.clientID }
+
         if(!pay.transactionAction.isSignatureValid(user.person.publicKey))
             return@req Status(failed = true, errorMessage = "Signature on transactionAction is not valid").toPayload()
+
+        if(blockchain.amounts[pay.transactionAction.clientID] ?: -1 < pay.transactionAction.amount)
+            return@req Status(failed = true, errorMessage = "You have insufficient funds",
+                extraData = "You have ${blockchain.amounts[pay.transactionAction.clientID]}gc, you need ${pay.transactionAction.amount}").toPayload()
+
         addToDataCache(pay.transactionAction)
         Status().toPayload()
     }),
     MONEY(Request.Response.MONEY, { pay ->
         pay as StringDataBlob
         SendableInt(blockchain.amounts[pay.value] ?: 0).toPayload()
+    }),
+    DATA_SUBMISSION(Request.Response.DATA, req@ {pay ->
+
+        if(!pay.isVerified)
+            return@req Status(failed = true,errorMessage =  "Unverified RequestDataBlob").toPayload()
+
+        pay as DataSubmissionDataBlob
+
+        if(pay.action.clientID != pay.clientID)
+            return@req Status(failed = true, errorMessage = "Different clientID for the DataBlob object and the transaction object object",
+                extraData = pay.clientID + " verses " + pay.action.clientID).toPayload()
+
+        if(pay.action.data.key != "name")
+            return@req Status(failed = true, errorMessage = "Data without the key `name` is invalid").toPayload()
+//        TODO("Remove, duh")
+
+        val user = blockchain.users.first { it.id == pay.clientID }
+
+        if(!pay.action.isSignatureValid(user.person.publicKey))
+            return@req Status(failed = true, errorMessage = "Signature on dataAction is not valid").toPayload()
+
+        if(blockchain.blocks.flatMap { it.actions }
+                .filter { it.type == ActionType.DATA }
+                .map { it as DataAction}
+                .any { it.data.uniqueID == pay.action.data.uniqueID })
+            return@req Status(failed = true, errorMessage = "Data already exists with identical ID",
+                extraData = "ID: ${pay.action.data.uniqueID}").toPayload()
+
+        addToDataCache(pay.action)
+        Status().toPayload()
     })
 }

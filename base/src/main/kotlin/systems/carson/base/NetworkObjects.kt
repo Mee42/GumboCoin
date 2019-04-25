@@ -2,8 +2,10 @@ package systems.carson.base
 
 import io.rsocket.Payload
 import io.rsocket.util.DefaultPayload
+import org.apache.commons.codec.digest.DigestUtils
 import java.nio.charset.Charset
 import java.security.PublicKey
+import java.util.*
 
 
 const val PORT = 48626
@@ -46,7 +48,8 @@ enum class RequestDataBlobType{
     BLOCK_DATA,
     STRING_DATA,
     INT_DATA,
-    TRANSACTION
+    TRANSACTION,
+    DATA_SUBMIT
 }
 
 fun String.trimAESPadding():String{
@@ -74,12 +77,14 @@ class StringDataBlob(clientID :String, val value :String, intent :String) :Reque
 class IntDataBlob(clientID :String, val value :Int, intent :String) :RequestDataBlob(intent,clientID,RequestDataBlobType.INT_DATA)
 class TransactionDataBlob(clientID: String, val transactionAction: TransactionAction) :RequestDataBlob(Request.Response.TRANSACTION,clientID,RequestDataBlobType.TRANSACTION)
 
+class DataSubmissionDataBlob(clientID: String, val action :DataAction):RequestDataBlob(Request.Response.DATA,clientID,RequestDataBlobType.DATA_SUBMIT)
+
 open class Action(val type: ActionType){
     companion object
 }
 
-class SignUpAction(val clientID :String,val publicKey :String) : Action(ActionType.SIGN_UP)
-class TransactionAction(val clientID :String, val recipientID: String, val amount :Int, val signature: String): Action(ActionType.TRANSACTION) {
+data class SignUpAction(val clientID :String,val publicKey :String) : Action(ActionType.SIGN_UP)
+data class TransactionAction(val clientID :String, val recipientID: String, val amount :Int, val signature: String): Action(ActionType.TRANSACTION) {
     fun isSignatureValid(publicKey: PublicKey): Boolean {
         return Person.verify(publicKey,Signature.fromBase64(signature),(clientID + recipientID + amount).toByteArray(Charset.forName("UTF-8")))
     }
@@ -93,8 +98,31 @@ class TransactionAction(val clientID :String, val recipientID: String, val amoun
         }
     }
 }
+data class DataPair(val key :String, val value :String,val uniqueID :String = DigestUtils.sha256Hex(UUID.randomUUID().toString()).substring(0,10))
+data class DataAction(val clientID :String,
+                      val data :DataPair,
+                      val signature :String) :Action(ActionType.DATA) {
+    private fun toSingableString():String{
+        return clientID + data.toString()
+    }
+    fun isSignatureValid(publicKey: PublicKey): Boolean {
+        return Person.verify(publicKey,Signature.fromBase64(signature),this.toSingableString().toByteArray(Charset.forName("UTF-8")))
+    }
+    companion object {
+        fun sign(clientID :String, data :DataPair,person :Person): DataAction {
+            return DataAction(
+                clientID = clientID,
+                data = data,
+                signature = person.sign(DataAction(
+                    clientID = clientID,
+                    data = data,
+                    signature = ""
+                ).toSingableString().toByteArray(Charset.forName("UTF-8"))).toBase64())
+        }
+    }
+}
 
-enum class ActionType { SIGN_UP,TRANSACTION }
+enum class ActionType { SIGN_UP,TRANSACTION,DATA }
 
 
 class Message(

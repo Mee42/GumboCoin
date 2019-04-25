@@ -107,19 +107,13 @@ fun main() {
 
     threadedMiner
         .toFlux()
-        .take(10)
+        .take(5)
         .index { index, tuple2 -> Tuples.of(index,tuple2.t1,tuple2.t2) }
         .map { println("Block!-${it.t1}") }
         .blockLast()
 
     threadedMiner.stop()
 
-    socket.requestResponse(RequestDataBlob(
-        clientID = clientID,
-        intent = Request.Response.BLOCKCHAIN))
-        .map { Sendable.fromJson<Blockchain>(it) }
-        .map { println("blockchain:${prettyPrint(it)}") }
-        .block()
 
     socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
         .map { Sendable.fromJson<SendableInt>(it) }
@@ -131,12 +125,25 @@ fun main() {
         TransactionAction.sign(
             clientID = clientID,
             recipientID = "server",
-            amount = 5,
+            amount = 2,
             person = me)
     ))
         .map { Sendable.fromJson<Status>(it) }
-        .printStatus("Transaction successfull")
+        .printStatus("Transaction successful")
         .block()
+
+    socket.requestResponse(DataSubmissionDataBlob(
+        clientID = clientID,
+        action = DataAction.sign(
+            clientID = clientID,
+            data = DataPair("name","Carson Graham"),
+            person = me
+        )
+    ))
+        .map { Sendable.fromJson<Status>(it) }
+        .printStatus("Data submission successful")
+        .block()
+
 
     threadedMiner.start()
 
@@ -208,29 +215,36 @@ class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = 
                     println("Updating block")
                     block = MutableBlock(update.removeAt(0).newBlock)
                 }
-                val bblock = if(block == null) { logger.debug("Block is null");continue@root }else{ block }
+                val bblock = if(block == null) {
+                    logger.debug("Block is null")
+                    Thread.sleep(sleepLength)
+                    continue@root
+                }else{
+                    block
+                }
                 val hash = bblock.hash()
                 if (hash.isValid()) {
 //                    println("Found valid hash: $hash")
                     bblock.signature =
                         me.sign(bblock.toBlock().excludeSignature().toByteArray(Charset.forName("UTF-8"))).toBase64()
                     val realBlock = bblock.toBlock()
-
+                    block = null
                     socket.requestResponse(
-                        BlockDataBlob(
-                            block = realBlock,
-                            clientID = clientID,
-                            intent = Request.Response.BLOCK.intent
+                            BlockDataBlob(
+                                block = realBlock,
+                                clientID = clientID,
+                                intent = Request.Response.BLOCK.intent
+                            )
                         )
-                    )
                         .map { Sendable.fromJson<Status>(it) }
-                        .printStatus("Block accepted successfully!",loggger,debugSuccess = true)
+                        .printStatus("Block accepted successfully!   hash:${bblock.hash()}",loggger,debugSuccess = true)
                         .map { hot.onNext(Tuples.of(realBlock, it)) }
                         .block()
+
 //                    println("BLock accepted block done")
                 } else {
                     bblock.nonce++
-//                    println("Invalid hash:$hash")
+//                    println("Invalid hash:$hash : ${bblock.hash()} : ${bblock.toBlock().hash()} : ${bblock.toBlock()}")
                 }
             }
         }

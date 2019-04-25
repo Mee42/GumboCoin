@@ -9,7 +9,8 @@ class Request{
         BLOCK("block"),
         BLOCKCHAIN("blockchain"),
         TRANSACTION("transaction"),
-        MONEY("money")
+        MONEY("money"),
+        DATA("data")
     }
     enum class Stream(val intent :String){
         NUMBERS("numbers"),

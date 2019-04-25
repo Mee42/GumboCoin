@@ -49,6 +49,11 @@ object GsonHolder{
                         recipientID = str("recipientID"),
                         amount = int("amount"),
                         signature = str("signature"))
+                    ActionType.DATA -> DataAction(
+                        clientID = clientID,
+                        data = context.deserialize(obj.getAsJsonObject("data"),DataPair::class.java),
+                        signature = str("signature")
+                    )
                 }
             }
         })
@@ -98,6 +103,11 @@ object GsonHolder{
                         clientID = clientID,
                         transactionAction = context.deserialize(obj.getAsJsonObject("transactionAction"),TransactionAction::class.java)
                     )
+                    RequestDataBlobType.DATA_SUBMIT -> DataSubmissionDataBlob(
+                        clientID = clientID,
+                        action = context.deserialize(obj.getAsJsonObject("action"),DataAction::class.java)
+                    )
+
                 }
             }
         })

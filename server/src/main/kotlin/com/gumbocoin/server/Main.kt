@@ -6,17 +6,22 @@ import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
+import kotlin.concurrent.thread
 
-const val diff = 2L
+const val diff = 4L
 
-var blockchain :Blockchain =
-    Blockchain(listOf(block(
-        KeyManager.server.sign(block(Signature.VOID.toBase64()).hash.toByteArray(Charset.forName("UTF-8"))).toBase64()
-    )))
+var blockchain: Blockchain =
+    Blockchain(
+        listOf(
+            block(
+                KeyManager.server.sign(block(Signature.VOID.toBase64()).hash.toByteArray(Charset.forName("UTF-8"))).toBase64()
+            )
+        )
+    )
 
 val logger = GLogger.logger()
 
-private fun block(sig :String):Block{
+fun block(sig: String): Block {
     return Block(
         author = "server",
         actions = listOf(),
@@ -24,27 +29,36 @@ private fun block(sig :String):Block{
         nonce = 0,
         difficulty = diff,
         lasthash = "null",
-        signature = sig)
+        signature = sig
+    )
 }
 
-val dataCache :MutableList<Action> = mutableListOf()
+val dataCache: MutableList<Action> = mutableListOf()
 
-fun addToDataCache(action :Action){
+fun addToDataCache(action: Action) {
     logger.info("Logging action: ${serialize(action)}")
     dataCache.add(action)
     sendUpdates()
 }
-fun clearDataCache(){
-    dataCache.clear()
+
+fun clearDataCache() {
+    dataCache.removeAll { true }
+
     sendUpdates()
 }
-fun sendUpdates(){
+
+fun sendUpdates() {
+
+    logger.info("Sending update. lastHash: ${blockchain.blocks.last().hash}")
     updateSource
-        .onNext(ActionUpdate(
-            actions = dataCache,
-            difficulty = diff,
-            lasthash = blockchain.blocks.last().hash
-        ))
+        .onNext(
+            ActionUpdate(
+                actions = dataCache,
+                difficulty = diff,
+                lasthash = blockchain.blocks.last().hash
+            )
+        )
+
 }
 
 val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionUpdate>()
@@ -61,7 +75,15 @@ fun main() {
     logger.info("Network initialized")
     logger.info("blockchain:" + serialize(blockchain))
 
+    val https = startHttps()
+
+    logger.info("Https setup")
+
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()
         .block()
+
+    logger.info("Killing https")
+    https.kill()
+    logger.info("Done")
 }
