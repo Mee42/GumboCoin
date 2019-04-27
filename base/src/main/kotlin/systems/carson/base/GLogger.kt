@@ -1,51 +1,109 @@
 package systems.carson.base
 
-interface GLogger {
-    fun debug(s :String)//for debugging, don't comment out println's, GLogger#debug
-    fun warning(s :String)//for errors
-    fun fatal(s :String)//log the error and then crash
-    fun info(s :String)//context and events happening
 
-    fun printDebug()
-    fun printWarnings()
-    fun printFatal()
-    fun printInfo()
+enum class GLevel(val level :Int){
+    DEBUG(0),
+    INFO(1),
+    WARNING(2),
+    IMPORTANT(3),
+    FATAL(4)
+}
+
+
+
+open class GLogger internal constructor(private val name :String? = null) {
+    fun debug(message :String)//for debugging, don't comment out println'message, GLogger#debug
+        = log(GLevel.DEBUG,message)
+    fun warning(message :String)//for errors
+        = log(GLevel.WARNING,message)
+    fun fatal(message :String)//log the error and then crash
+        = log(GLevel.FATAL, message)
+    fun info(message :String)//context and events happening
+        = log(GLevel.INFO,message)
+
+    fun log(level :GLevel, message :String){
+        log(Information(
+            level,
+            message,
+            name))
+    }
+
+    private fun log(i :Information){
+        GManager.log(i)
+    }
+
 
     companion object
 }
 
-fun GLogger.Companion.logger():GLogger = Single.logger
+class Information(
+    val level :GLevel,
+    val message :String,
+    val nameOfLogger :String?
+)
 
-private object Single{
-    val logger by lazy { DefaultGLogger("%LEVEL%: $PAD%STR%") }
+interface GLog{
+    val level :GLevel
+    fun log(information :Information)
 }
 
-fun GLogger.Companion.logger(name :String):GLogger = LoggerWithName(name)
-
-
+object GManager{
+    private val outputs = mutableListOf<GLog>()
+    fun addLoggerImpl(glog :GLog){
+        outputs+=glog
+    }
+    internal fun log(i :Information){
+        outputs.forEach {
+            if(it.level.level <= i.level.level){ it.log(i) }
+        }
+    }
+}
 private const val PAD = "%PAD_HERE%"
 private const val PAD_LENGTH = 15
 
-private open class DefaultGLogger(val builder :String) :GLogger{
 
-    private enum class GLevel(val level :Int){
-        DEBUG(0),
-        INFO(1),
-        WARNING(2),
-        FATAL(3)
+class OutputGLogger :GLog{
+    fun setLevel(level :GLevel){
+        levelI = level
     }
-    private var level :GLevel = GLevel.DEBUG
-
-    protected open fun getData():Map<String,String> = emptyMap()
-    private fun getData(level :String):Map<String,String> = getData() + mapOf("level" to level)
-
+    override val level: GLevel
+        get() = levelI
+    private var levelI = GLevel.WARNING
 
 
-    private fun format(str :String,data :Map<String,String>):String{
+
+
+    private val builder = "%LEVEL%: $PAD%STR%"
+    private val namedBuilder = "%LEVEL% - %NAME%: $PAD%STR%"
+
+    private fun getData(level :GLevel):Map<String,String> = mapOf("level" to level.toString())
+
+    override fun log(information: Information) {
+        val name = information.nameOfLogger
+        val str = if(name != null){
+            format(namedBuilder,information.message,getData(information.level) + mapOf("name" to name))
+        }else{
+            format(builder,information.message,getData(information.level))
+        }
+        print(str,information.level)
+    }
+
+    private fun print(str :String, level :GLevel){
+        when(level){
+            GLevel.DEBUG -> println(str)
+            else -> System.err.println(str)
+        }
+    }
+
+    private fun format(builder :String,str :String,data :Map<String,String>):String{
         return (data + mapOf("str" to str)).toList()
             .fold(builder) { a,b -> a.replaceData(b.first,b.second) }
             .pad()
     }
+    private fun String.replaceData(name :String, value :String):String{
+        return this.replace("%${name.toUpperCase()}%",value)
+    }
+
 
     private fun String.pad():String{
         return if(!this.contains(PAD))
@@ -56,47 +114,7 @@ private open class DefaultGLogger(val builder :String) :GLogger{
 
     }
 
-    private fun String.replaceData(name :String, value :String):String{
-        return this.replace("%${name.toUpperCase()}%",value)
-    }
-
-    override fun debug(s: String) {
-        if(level.level <= GLevel.DEBUG.level)
-            println(format(s,getData("DEBUG")))
-    }
-
-    override fun warning(s: String) {
-        if(level.level <= GLevel.WARNING.level)
-            System.err.println(format(s,getData("WARN")))
-    }
-
-    override fun fatal(s: String) {
-        if(level.level <= GLevel.FATAL.level)
-            System.err.println(format(s,getData("FATAL")))
-    }
-
-    override fun info(s: String) {
-        if(level.level <= GLevel.INFO.level)
-            System.err.println(format(s,getData("INFO")))
-    }
-
-    override fun printDebug() {
-        level = GLevel.DEBUG
-    }
-
-    override fun printWarnings() {
-        level = GLevel.WARNING
-    }
-
-    override fun printFatal() {
-        level = GLevel.FATAL
-    }
-
-    override fun printInfo() {
-        level = GLevel.INFO
-    }
 }
 
-private class LoggerWithName(val name :String) :DefaultGLogger("%LEVEL% - %NAME%: $PAD%STR%") {
-    override fun getData(): Map<String,String> = mapOf("name" to name) + super.getData()
-}
+fun GLogger.Companion.logger():GLogger = GLogger()
+fun GLogger.Companion.logger(name :String):GLogger = GLogger(name)

@@ -27,9 +27,13 @@ dependencies {
     implementation 'io.rsocket:rsocket-transport-netty:0.11.14'
 
 
-    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta4'
+//    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta4'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.8.0-beta4'
+// https://mvnrepository.com/artifact/org.slf4j/slf4j-nop
+    implementation group: 'org.slf4j', name: 'slf4j-nop', version: '1.8.0-beta4'
 
     implementation "com.sparkjava:spark-core:2.8.0"
+
+    implementation "com.discord4j:discord4j-core:3.0.3"
 }
 
