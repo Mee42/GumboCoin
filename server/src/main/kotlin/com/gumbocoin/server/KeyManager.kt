@@ -5,7 +5,8 @@ import java.io.File
 import java.nio.charset.Charset
 
 enum class Release(val str :String){
-    BETA("beta")
+    BETA("beta"),
+    DEV("dev")
 }
 
 object KeyManager {
@@ -29,5 +30,4 @@ object KeyManager {
 
 
     val server :Person by lazy { get("server.gc.key") }
-
 }

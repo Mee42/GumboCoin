@@ -2,12 +2,10 @@ package com.gumbocoin.server
 
 
 
+import com.sun.prism.PixelFormat
 import reactor.util.function.Tuples
 import spark.Spark.*
-import systems.carson.base.ActionType
-import systems.carson.base.TransactionAction
-import systems.carson.base.TransactionDataBlob
-import systems.carson.base.prettyPrint
+import systems.carson.base.*
 
 interface Killable {
     fun kill()
@@ -55,8 +53,22 @@ fun startHttps(): Killable {
     }
     get("/blocks"){_,_-> deserializeForHtml(blockchain.blocks.size) }
     get("/users"){_,_ ->
-        deserializeForHtml(blockchain.users)
-        TODO("fix this")
+
+        deserializeForHtml(blockchain.users.map { SerializedUser(it.id,it.person.publicKeyBase64(),
+            blockchain.blocks.flatMap { w -> w.actions }
+                .filter { w -> w.type == ActionType.DATA }
+                .map { w -> w as DataAction}
+                .filter { w -> w.clientID == it.id }) } )
+    }
+    get("/user/:id")  req@ {req,_ ->
+
+        val id = req.params("id")
+        val user = blockchain.users.firstOrNull { it.id == id } ?: return@req error("User not found")
+        deserializeForHtml(SerializedUser(id,user.person.publicKeyBase64(),
+            blockchain.blocks.flatMap { w -> w.actions }
+                .filter { w -> w.type == ActionType.DATA }
+                .map { w -> w as DataAction}
+                .filter { w -> w.clientID == id }))
     }
     get("/actions") {_,_ ->
         deserializeForHtml(blockchain.blocks
@@ -74,7 +86,7 @@ fun startHttps(): Killable {
     }
 
 
-    notFound("<html><body>${error("404 - page not found")}</body></html>")
+    notFound(error("404 - page not found"))
 
     return object : Killable {
         override fun kill() {}
@@ -82,3 +94,8 @@ fun startHttps(): Killable {
 
 }
 
+private class SerializedUser(
+    val clientID :String,
+    val publicKey :String,
+    val data :List<DataAction>
+)

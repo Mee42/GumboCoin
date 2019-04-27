@@ -103,17 +103,7 @@ fun main() {
             )
         }.subscribe()
 
-    threadedMiner.start()
-
-    threadedMiner
-        .toFlux()
-        .take(5)
-        .index { index, tuple2 -> Tuples.of(index,tuple2.t1,tuple2.t2) }
-        .map { println("Block!-${it.t1}") }
-        .blockLast()
-
-    threadedMiner.stop()
-
+    threadedMiner.mineAbout(3)
 
     socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
         .map { Sendable.fromJson<SendableInt>(it) }
@@ -132,6 +122,8 @@ fun main() {
         .printStatus("Transaction successful")
         .block()
 
+    threadedMiner.mineAbout(3)
+
     socket.requestResponse(DataSubmissionDataBlob(
         clientID = clientID,
         action = DataAction.sign(
@@ -144,17 +136,7 @@ fun main() {
         .printStatus("Data submission successful")
         .block()
 
-
-    threadedMiner.start()
-
-    threadedMiner
-        .toFlux()
-        .take(1)
-        .index { index, tuple2 -> Tuples.of(index,tuple2.t1,tuple2.t2) }
-        .map { println("Block!-${it.t1}") }
-        .blockLast()
-
-    threadedMiner.stop()
+    threadedMiner.mineAbout(3)
 
     socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
         .map { Sendable.fromJson<SendableInt>(it) }
@@ -168,7 +150,16 @@ fun main() {
     threadedMiner.exit()
 }
 
+fun ThreadedMiner.mineAbout(i :Int){
+    start()
+    toFlux()
+        .take(i.toLong())
+        .blockLast()
+    stop()
+}
+
 class Update(val newBlock: Block)
+
 class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = GLogger.logger(), sleep: Long = 100) {
 
 

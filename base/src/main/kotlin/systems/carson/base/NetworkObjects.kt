@@ -102,6 +102,7 @@ data class DataPair(val key :String, val value :String,val uniqueID :String = Di
 data class DataAction(val clientID :String,
                       val data :DataPair,
                       val signature :String) :Action(ActionType.DATA) {
+
     private fun toSingableString():String{
         return clientID + data.toString()
     }
