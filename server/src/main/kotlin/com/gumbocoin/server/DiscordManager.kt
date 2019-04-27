@@ -1,11 +1,12 @@
 package com.gumbocoin.server
 
-import discord4j.core.DiscordClientBuilder
-import com.gumbocoin.server.Release.*
 import discord4j.core.DiscordClient
+import discord4j.core.DiscordClientBuilder
 import discord4j.core.`object`.entity.TextChannel
 import discord4j.core.`object`.util.Snowflake
 import reactor.core.publisher.Mono
+import systems.carson.base.Release.*
+import systems.carson.base.ReleaseManager.release
 
 object DiscordManager {
     val client :DiscordClient =
@@ -15,14 +16,14 @@ object DiscordManager {
     val logChannel : Mono<TextChannel> by lazy {
         client.getChannelById(
             Snowflake.of(
-                logging[KeyManager.release]
-                    ?: error("Can't find logging channel for release ${KeyManager.release}")
+                logging[release]
+                    ?: error("Can't find logging channel for release $release")
             )
         ).cast(TextChannel::class.java)
     }
     val blockchainChannel:Mono<TextChannel> by lazy {
-        client.getChannelById(Snowflake.of(blockchain[KeyManager.release]
-            ?: error("Can't find blockchain channel for release ${KeyManager.release}")))
+        client.getChannelById(Snowflake.of(blockchain[release]
+            ?: error("Can't find blockchain channel for release $release")))
             .cast(TextChannel::class.java)
     }
 

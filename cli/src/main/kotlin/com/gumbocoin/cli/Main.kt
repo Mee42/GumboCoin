@@ -63,10 +63,13 @@ inline fun <reified T> Mono<String>.mapFromJson(): Mono<T> = map { it.trimAESPad
     .map { deserialize<T>(it) }
 
 fun main() {
-    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
-    logger.printInfo()
-    network.printWarnings()
+    println("STARTING CLI: MODE: ${ReleaseManager.release}")
 
+    System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
+
+    val outputManager = OutputGLogger()
+    outputManager.setLevel(GLevel.INFO)
+    GManager.addLoggerImpl(outputManager)
 
     val socket = RSocketFactory.connect()
         .transport(TcpClientTransport.create("localhost", PORT))

@@ -1,8 +1,11 @@
 package com.gumbocoin.server
 
 
+import discord4j.core.DiscordClientBuilder
 import discord4j.core.`object`.entity.GuildChannel
 import discord4j.core.`object`.entity.TextChannel
+import discord4j.core.event.domain.message.MessageCreateEvent
+import discord4j.gateway.json.dispatch.MessageCreate
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
 import org.slf4j.LoggerFactory
@@ -72,7 +75,8 @@ val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionU
 
 
 fun main() {
-    println("STARTING SERVER: MODE: ${KeyManager.release}")
+    println("STARTING SERVER: MODE: ${ReleaseManager.release}")
+
 
     val outputLogger = OutputGLogger()
     outputLogger.setLevel(GLevel.DEBUG)
@@ -96,10 +100,10 @@ fun main() {
 
     val discordLogger = DiscordLogger()
 
-    discordLogger.setLevel(GLevel.WARNING)
+        discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
 
-    logger.log(GLevel.IMPORTANT,"Server started. Mode: ${KeyManager.release}")
+    logger.log(GLevel.IMPORTANT,"Server started. Mode: ${ReleaseManager.release}")
 
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()
