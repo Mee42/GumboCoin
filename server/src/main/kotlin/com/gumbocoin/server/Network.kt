@@ -17,7 +17,11 @@ fun String.toPayload():Payload = DefaultPayload.create(this)
 
 
 fun isValid(message: Message):Boolean{
-    val people = blockchain.users.map { it.id to it.person }.toMap()
+    val people = blockchain.users.map { it.id to it.person }.toMap() +
+            dataCache.filter { it.type == ActionType.SIGN_UP }
+                .map { it as SignUpAction }
+                .map { it.clientID to Person.fromPublicKey(it.publicKey ) }
+                .toMap()
     if(!people.containsKey(message.clientID))
         return false
     val data = message.encryptedData.toBytes().concat()

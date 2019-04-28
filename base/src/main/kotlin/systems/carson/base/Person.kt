@@ -35,7 +35,7 @@ class Person private constructor(
 
     companion object {
         const val MAX_RSA_BYTES = 245
-        private val sig = java.security.Signature.getInstance("SHA1WithRSA")
+        private val sig = java.security.Signature.getInstance("SHA512WithRSA")
 
         fun verify(publicKey: PublicKey, signature: Signature, data: ByteArray): Boolean {
             sig.initVerify(publicKey)
@@ -49,9 +49,12 @@ class Person private constructor(
         /** This will encryptRSA over 245 bytes */
         fun encryptAES(data :ByteArray,person :Person):EncryptedBytes = encryptAES(data,person.publicKey)
 
+
+        const val AES_CIPHER = "AES/CTR/PKCS5Padding"
         /** This will encryptRSA over 245 bytes */
         fun encryptAES(data :ByteArray, publicKey : PublicKey): EncryptedBytes {
-            val iv = ByteArray(16) { -1 }
+
+            val iv = ByteArray(16)
             SecureRandom.getInstanceStrong().nextBytes(iv)
 
             val keyGen = KeyGenerator.getInstance("AES")
@@ -60,7 +63,7 @@ class Person private constructor(
 
 
             val ivParameterSpec = IvParameterSpec(iv)
-            val aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+            val aesCipher = Cipher.getInstance(AES_CIPHER)
             aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
 
             val final = aesCipher.doFinal(data)
@@ -211,7 +214,7 @@ class Person private constructor(
         val secretKey = SecretKeySpec(decryptedSecretKey, 0, decryptedSecretKey.size, "AES")
 
 
-        val aesCipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
+        val aesCipher = Cipher.getInstance(AES_CIPHER)
         aesCipher.init(Cipher.DECRYPT_MODE, secretKey, ivParameterSpec)
 
         return aesCipher.doFinal(data.encryptedData)

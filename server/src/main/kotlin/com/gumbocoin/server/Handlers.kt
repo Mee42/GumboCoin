@@ -9,6 +9,7 @@ import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.nio.charset.Charset
+import java.time.Duration
 import java.time.Instant
 
 
@@ -36,6 +37,7 @@ enum class StreamHandler(
 enum class ResponseHandler(
     val request :Request.Response,
     val handler :(RequestDataBlob) -> Payload){
+
     PING(Request.Response.PING,req@ { "pong".toPayload() }),
     DECRYPT(Request.Response.DECRYPT,req@ {pay ->
         pay as EncryptedDataBlob
@@ -57,6 +59,13 @@ enum class ResponseHandler(
         pay as BlockDataBlob
         val block:Block = pay.block
         handlerLogger.debug("got block:$block")
+
+        if(block.difficulty != diff){
+            return@req Status(failed = true,
+                errorMessage = "Difficulty is wrong",
+                extraData = "Expected $diff, got ${block.difficulty}").toPayload()
+        }
+
         if(!block.hash.isValid())
             return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
         if(dataCache != pay.block.actions){
@@ -72,6 +81,7 @@ enum class ResponseHandler(
                 extraData = "expected: ${blockchain.blocks.last().hash} and got ${block.lasthash}").toPayload()
         val newBlockchain = blockchain.newBlock(block)
         val valid = newBlockchain.isValid()
+
         if(valid.isPresent) {
             return@req Status(
                 failed = true,
@@ -80,7 +90,10 @@ enum class ResponseHandler(
             ).toPayload()
         }
 
+
         blockchain = newBlockchain
+        makeNewDiff()
+
         clearDataCache()
         DiscordManager.blockchainChannel
             .flatMap { it.createEmbed { spec ->
@@ -105,7 +118,7 @@ enum class ResponseHandler(
 //                                .map { w -> w.asFormat() }
 //                                .block()
 //                            println("===")
-                            var s = if(true) " Gumbocoins " else "<:gbc:572065175818076200:>"
+                            val s = " Gumbocoin"//if(true) " Gumbocoins " else "<:gbc:572065175818076200:>"
                             spec.addField("`${act.clientID}` paid `${act.recipientID}`","${act.amount} $s",true)
                         }
                     }
@@ -176,4 +189,42 @@ enum class ResponseHandler(
         addToDataCache(pay.action)
         Status().toPayload()
     })
+}
+
+
+val targetBlockTime: Duration = Duration.ofMinutes(1)
+
+fun makeNewDiff(){
+    val allTimedBlocks = blockchain.blocks.subList(
+        blockchain.blocks.indexOfFirst { !Duration.ofMillis(it.timestamp).minusMinutes(10).isNegative },
+        blockchain.blocks.size)
+
+    val timedBlocks = if(allTimedBlocks.size > 5) allTimedBlocks.subList(0,5) else allTimedBlocks
+
+    if(timedBlocks.isEmpty() || blockchain.blocks.size < 4){
+        //if there are no blocks, either no one is mineing or no one has mined anything in the last hour
+        // just don't change diff. It's not worth the time
+        return
+    }
+
+    val totalTime = Duration.ofMillis(timedBlocks.last().timestamp - timedBlocks.first().timestamp)
+    val timePerBlock = totalTime.dividedBy(timedBlocks.size.toLong())
+    //what do we want timePerBlock to be? I say 5. Lets do 5
+    //edit:changed to 1 min
+    val diffOverTime = timedBlocks.map { it.difficulty }.average().toLong()
+    var timePerDiff = timePerBlock.toMillis() / diffOverTime
+    if(timePerDiff == 0L)
+        timePerDiff = 1
+    val newDiff = targetBlockTime.dividedBy(timePerDiff).toMillis()
+    println("newDiff: $newDiff")
+    if(newDiff > 3)
+        diff = newDiff
+
+    System.err.println("new diff is $diff")
+    // m a t h
+    // timePerDiff = timePerBlock / diff
+    // timePerDiff * diff = timePerBlock
+    // timePerDiff * newDiff = targetBlockTime    // swap out timePerBlock with the target, and diff with the new value
+    // newDiff = targetBlockTime / timePerDiff //isolate newDiff
+
 }

@@ -64,7 +64,7 @@ fun Block.excludeSignature():String{
 
 fun Block.hash():String{
     var str = excludeSignature()
-    for(i in 0 until difficulty)
+    for(i in 0..difficulty)
         str = DigestUtils.sha256Hex(str + this.nonce)
     return str
 }

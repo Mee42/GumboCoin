@@ -9,6 +9,8 @@ import systems.carson.base.*
 import java.nio.charset.Charset
 
 
+val network = GLogger.logger("Network")
+
 fun Mono<Status>.printStatus(message :String = "", loggger : GLogger = GLogger.logger(), debugSuccess :Boolean = false): Mono<Status> = this.map {
     if(it.failed){
         it.errorMessage
@@ -32,14 +34,17 @@ fun Flux<Status>.printStatus(message :String = "", loggger : GLogger = GLogger.l
 }
 
 
-fun RSocket.requestStream(data: RequestDataBlob) : Flux<String> =
+inline fun <reified T> Mono<String>.mapFromJson(): Mono<T> = map { it.trimAESPadding() }
+    .map { deserialize<T>(it) }
+
+fun RSocket.requestStream(data: RequestDataBlob, keys :Person) : Flux<String> =
     Mono.just(data)
         .map { serialize(it) }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
-            clientID = clientID,
+            clientID = data.clientID,
             encryptedData = encrypted.toStrings(),
-            signature = me.sign(encrypted.concat()).toBase64()
+            signature = keys.sign(encrypted.concat()).toBase64()
         ) }
         .map { message: Message -> serialize(message) }
         .map { network.info("Making request: $it");it }
@@ -49,7 +54,7 @@ fun RSocket.requestStream(data: RequestDataBlob) : Flux<String> =
         .map { it.dataUtf8 }
         .map { deserialize<EncryptedString>(it) }
         .map { it.toBytes() }
-        .map { me.decryptAESAndTestDefaultKey(it) }
+        .map { keys.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
         .map { it.toString(Charset.forName("UTF-8")) }
         .map { network.info("Got Stream Response: $it");it }
@@ -58,15 +63,15 @@ fun RSocket.requestStream(data: RequestDataBlob) : Flux<String> =
 
 
 
-fun RSocket.requestResponse(data :RequestDataBlob) : Mono<String> =
+fun RSocket.requestResponse(data :RequestDataBlob, keys :Person) : Mono<String> =
     Mono.just(data)
         .map { serialize(it) }
-        .map { logger.info(it);it }
+        .map { network.debug(it);it }
         .map { Person.encryptAES(it.toByteArray(Charset.forName("UTF-8")), server) }
         .map { encrypted : EncryptedBytes -> Message(
-            clientID = clientID,
+            clientID = data.clientID,
             encryptedData = encrypted.toStrings(),
-            signature = me.sign(encrypted.concat()).toBase64()
+            signature = keys.sign(encrypted.concat()).toBase64()
         ) }
         .map { message: Message -> serialize(message) }
         .map { network.info("Making request: $it");it }
@@ -74,10 +79,10 @@ fun RSocket.requestResponse(data :RequestDataBlob) : Mono<String> =
         .map { DefaultPayload.create(it) }
         .flatMap { requestResponse(it) }
         .map { it.dataUtf8 }
-        .map { logger.debug(it);it }
+        .map { network.debug(it);it }
         .map { deserialize<EncryptedString>(it) }
         .map { it.toBytes() }
-        .map { me.decryptAESAndTestDefaultKey(it) }
+        .map { keys.decryptAESAndTestDefaultKey(it) }
         .onErrorMap { Exceptions.addSuppressed(IllegalAccessException("Can not decrypt data from the server - unauthorized?"), it) }
         .map { it.toString(Charset.forName("UTF-8")) }
         .map { network.info("Got Response: $it");it }

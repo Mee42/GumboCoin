@@ -1,24 +1,14 @@
 package com.gumbocoin.server
 
 
-import discord4j.core.DiscordClientBuilder
-import discord4j.core.`object`.entity.GuildChannel
-import discord4j.core.`object`.entity.TextChannel
-import discord4j.core.event.domain.message.MessageCreateEvent
-import discord4j.gateway.json.dispatch.MessageCreate
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
-import org.slf4j.LoggerFactory
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
-import kotlin.concurrent.thread
-import org.slf4j.spi.LocationAwareLogger
-import java.lang.reflect.AccessibleObject.setAccessible
 
 
-
-const val diff = 4L
+var diff = 25L
 
 var blockchain: Blockchain =
     Blockchain(
