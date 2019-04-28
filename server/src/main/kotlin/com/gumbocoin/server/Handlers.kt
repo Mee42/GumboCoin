@@ -195,6 +195,8 @@ enum class ResponseHandler(
 val targetBlockTime: Duration = Duration.ofMinutes(1)
 
 fun makeNewDiff(){
+    //TODO make more concise and make a get() on the diff value.
+    // memoized per blockchain?
     val allTimedBlocks = blockchain.blocks.subList(
         blockchain.blocks.indexOfFirst { !Duration.ofMillis(it.timestamp).minusMinutes(10).isNegative },
         blockchain.blocks.size)
