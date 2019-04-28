@@ -22,7 +22,7 @@ fun Blockchain.isValid(): Optional<String> {
         if(block.lasthash != old.hash)
             return Optional.of("Block lasthash is incorrect\nNeeded ${old.hash}, got ${block.lasthash}")
         val sig = Signature.fromBase64(block.signature)
-        val user = this.users.firstOrNull { it.id == block.author } ?: return Optional.of("Can't find user on the blockchain")
+        val user = this.subBlockchain(i + 1).users.firstOrNull { it.id == block.author } ?: return Optional.of("Can't find user on the blockchain")
         val valid = Person.verify(user.person,sig,block.excludeSignature().toByteArray(Charset.forName("UTF-8")))
         // make sure it's signed properly.
         // The user needs to be on the blockchain because we need both the public key and the signature to verify it
@@ -30,6 +30,11 @@ fun Blockchain.isValid(): Optional<String> {
             return Optional.of("User signature is invalid")
     }
     return Optional.empty()
+}
+
+
+fun Blockchain.subBlockchain(endIndex :Int):Blockchain{
+    return Blockchain(this.blocks.subList(0,endIndex))
 }
 
 
@@ -60,6 +65,6 @@ fun Block.excludeSignature():String{
 fun Block.hash():String{
     var str = excludeSignature()
     for(i in 0 until difficulty)
-        str = DigestUtils.sha256Hex(str)
+        str = DigestUtils.sha256Hex(str + this.nonce)
     return str
 }
