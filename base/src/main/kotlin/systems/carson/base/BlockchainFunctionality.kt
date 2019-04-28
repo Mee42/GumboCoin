@@ -39,7 +39,7 @@ fun Blockchain.subBlockchain(endIndex :Int):Blockchain{
 
 
 
-const val zeros = 1
+const val zeros = 5
 fun String.isValid():Boolean{
     return this.length > zeros && !this.substring(0,zeros).any { it != '0' }
 }

@@ -30,16 +30,3 @@ dependencies {
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.8.0-beta4'
 
 }
-
-
-apply plugin: 'maven'
-
-task createPom  {
-    pom {
-        project {
-            groupId 'com.gumbocoin'
-            artifactId 'gumbocoin'
-            version '1.0.0'
-        }
-    }.writeTo("pom.xml")
-}

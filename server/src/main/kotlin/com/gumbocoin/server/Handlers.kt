@@ -1,11 +1,15 @@
 package com.gumbocoin.server
 
+import discord4j.common.json.EmojiResponse
+import discord4j.core.DiscordClient
+import discord4j.core.`object`.util.Snowflake
 import io.rsocket.Payload
 import reactor.core.publisher.Flux
 import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.nio.charset.Charset
+import java.time.Instant
 
 
 val handlerLogger = GLogger.logger("Handler")
@@ -51,7 +55,7 @@ enum class ResponseHandler(
     }),
     BLOCK(Request.Response.BLOCK, req@ { pay ->
         pay as BlockDataBlob
-        val block = pay.block
+        val block:Block = pay.block
         handlerLogger.debug("got block:$block")
         if(!block.hash.isValid())
             return@req Status(failed = true, errorMessage = "Block hash is wrong",extraData = "Hash: ${block.hash}").toPayload()
@@ -78,6 +82,37 @@ enum class ResponseHandler(
 
         blockchain = newBlockchain
         clearDataCache()
+        DiscordManager.blockchainChannel
+            .flatMap { it.createEmbed { spec ->
+                spec.setTitle("Author:" + block.author)
+                    .setTimestamp(Instant.ofEpochMilli(block.timestamp))
+                    .addField("nonce","" + block.nonce,true)
+                    .addField("difficulty","" + block.difficulty,true)
+                    .addField("lasthash",block.lasthash,true)
+                    .addField("hash",block.hash,true)
+                block.actions.forEach { act ->
+                    when(act){
+                        is SignUpAction -> {
+                            spec.addField("Signed up",act.clientID,true)
+                        }
+                        is DataAction -> {
+                            spec.addField("Data for ${act.clientID} (${act.data.uniqueID})",act.data.key + " : " + act.data.value,true)
+                        }
+                        is TransactionAction -> {
+//                            println("===")
+//                            val gbc = DiscordManager.client
+//                                .getGuildEmojiById(Snowflake.of(566998443218960434),Snowflake.of(572065175818076200))
+//                                .map { w -> w.asFormat() }
+//                                .block()
+//                            println("===")
+                            var s = if(true) " Gumbocoins " else "<:gbc:572065175818076200:>"
+                            spec.addField("`${act.clientID}` paid `${act.recipientID}`","${act.amount} $s",true)
+                        }
+                    }
+                }
+                spec.setAuthor("Block ${blockchain.blocks.size - 1}","","")
+            } }
+            .subscribe()
         Status().toPayload()
     }),
     BLOCKCHAIN(Request.Response.BLOCKCHAIN, { blockchain.toPayload() }),

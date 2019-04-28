@@ -77,7 +77,6 @@ val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionU
 fun main() {
     println("STARTING SERVER: MODE: ${ReleaseManager.release}")
 
-
     val outputLogger = OutputGLogger()
     outputLogger.setLevel(GLevel.DEBUG)
 
@@ -99,8 +98,7 @@ fun main() {
     DiscordManager.client.login().subscribe()
 
     val discordLogger = DiscordLogger()
-
-        discordLogger.setLevel(GLevel.WARNING)
+    discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
 
     logger.log(GLevel.IMPORTANT,"Server started. Mode: ${ReleaseManager.release}")
