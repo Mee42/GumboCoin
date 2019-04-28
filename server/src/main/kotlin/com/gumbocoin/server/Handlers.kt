@@ -99,13 +99,14 @@ enum class ResponseHandler(
                             spec.addField("Data for ${act.clientID} (${act.data.uniqueID})",act.data.key + " : " + act.data.value,true)
                         }
                         is TransactionAction -> {
-                            println("===")
+//                            println("===")
 //                            val gbc = DiscordManager.client
 //                                .getGuildEmojiById(Snowflake.of(566998443218960434),Snowflake.of(572065175818076200))
 //                                .map { w -> w.asFormat() }
 //                                .block()
-                            println("===")
-                            spec.addField("`${act.clientID}` paid `${act.recipientID}`","${act.amount} <:gbc:572065175818076200:>",true)
+//                            println("===")
+                            var s = if(true) " Gumbocoins " else "<:gbc:572065175818076200:>"
+                            spec.addField("`${act.clientID}` paid `${act.recipientID}`","${act.amount} $s",true)
                         }
                     }
                 }
