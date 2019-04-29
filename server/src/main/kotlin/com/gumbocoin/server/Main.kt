@@ -6,9 +6,14 @@ import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
+import java.time.Duration
+import java.time.Instant
 
+val targetBlockTime: Duration = Duration.ofMinutes(1)
+val blockInTheLast : Duration = Duration.ofMinutes(2)
+const val wantedBlocks = 2
+const val defaultDifficulty = 4L
 
-var diff = 25L
 
 var blockchain: Blockchain =
     Blockchain(
@@ -19,6 +24,56 @@ var blockchain: Blockchain =
         )
     )
 
+val diff :Long
+    get(){
+        if(blockchain.blocks.size < 5)
+            return defaultDifficulty
+
+//        val lastFiveBlocks = blockchain.blocks.subList(blockchain.blocks.size - 5,blockchain.blocks.size)
+
+
+        val timedBlocks = blockchain.blocks.filter { Duration.between(Instant.ofEpochMilli(it.timestamp), Instant.now()).abs().toMillis() < blockInTheLast.toMillis() }
+
+        if(timedBlocks.size <= 1){
+            //if there are no blocks, either no one is mining or no one has mined anything in the last hour
+            // just don't change diff. It's not worth the time
+            return blockchain.blocks.last().difficulty//don't change it
+        }
+
+        //  diffsOverTime = sum { it -> it.diff }
+        //  blocksOverTime = count()
+        //  wantedBlocksOverTime = constant
+
+        //  diffsOverTime      wantedDiffsOverTime
+        // ---------------  = ---------------------
+        //  blocksOverTime     wantedBlocksOverTime
+
+        // wantedDiffsOverTime = (diffsOverTime * wantedBlocksOverTime) / blocksOverTime
+        // diff = wantedDiffsOverTime / wantedBlocksOverTime
+
+        // diff = ((diffsOverTime * wantedBlocks ) / blocks) / wantedBlocksOverTime
+
+
+        println("timedBlocks: $timedBlocks")
+        val diffsOverTime = timedBlocks.fold(0L) { a,b -> a + b.difficulty }
+        println("Diffs over time: $diffsOverTime")
+        val blocksOverTime = timedBlocks.size
+        println("BLocks over time: $blocksOverTime")
+        println("Wanted blocks over time:$wantedBlocks")
+        val wantedDiffsOverTime = (diffsOverTime * wantedBlocks) / blocksOverTime
+        println("wantedDiffsOverTime:$wantedDiffsOverTime")
+        val newDiff = wantedDiffsOverTime / wantedBlocks
+
+        println("newDiff: $newDiff")
+        return if(newDiff > 3)
+            newDiff
+        else {
+            System.out.println("newDiff is <= 3")
+            4L
+        }
+    }
+
+
 val logger = GLogger.logger()
 
 fun block(sig: String): Block {
@@ -27,7 +82,7 @@ fun block(sig: String): Block {
         actions = listOf(),
         timestamp = System.currentTimeMillis(),
         nonce = 0,
-        difficulty = diff,
+        difficulty = defaultDifficulty,
         lasthash = "null",
         signature = sig
     )

@@ -1,11 +1,7 @@
 package com.gumbocoin.server
 
-import discord4j.common.json.EmojiResponse
-import discord4j.core.DiscordClient
-import discord4j.core.`object`.util.Snowflake
 import io.rsocket.Payload
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.nio.charset.Charset
@@ -92,8 +88,6 @@ enum class ResponseHandler(
 
 
         blockchain = newBlockchain
-        makeNewDiff()
-
         clearDataCache()
         DiscordManager.blockchainChannel
             .flatMap { it.createEmbed { spec ->
@@ -192,41 +186,3 @@ enum class ResponseHandler(
 }
 
 
-val targetBlockTime: Duration = Duration.ofMinutes(1)
-
-fun makeNewDiff(){
-    //TODO make more concise and make a get() on the diff value.
-    // memoized per blockchain?
-    val allTimedBlocks = blockchain.blocks.subList(
-        blockchain.blocks.indexOfFirst { !Duration.ofMillis(it.timestamp).minusMinutes(10).isNegative },
-        blockchain.blocks.size)
-
-    val timedBlocks = if(allTimedBlocks.size > 5) allTimedBlocks.subList(0,5) else allTimedBlocks
-
-    if(timedBlocks.isEmpty() || blockchain.blocks.size < 4){
-        //if there are no blocks, either no one is mineing or no one has mined anything in the last hour
-        // just don't change diff. It's not worth the time
-        return
-    }
-
-    val totalTime = Duration.ofMillis(timedBlocks.last().timestamp - timedBlocks.first().timestamp)
-    val timePerBlock = totalTime.dividedBy(timedBlocks.size.toLong())
-    //what do we want timePerBlock to be? I say 5. Lets do 5
-    //edit:changed to 1 min
-    val diffOverTime = timedBlocks.map { it.difficulty }.average().toLong()
-    var timePerDiff = timePerBlock.toMillis() / diffOverTime
-    if(timePerDiff == 0L)
-        timePerDiff = 1
-    val newDiff = targetBlockTime.dividedBy(timePerDiff).toMillis()
-    println("newDiff: $newDiff")
-    if(newDiff > 3)
-        diff = newDiff
-
-    System.err.println("new diff is $diff")
-    // m a t h
-    // timePerDiff = timePerBlock / diff
-    // timePerDiff * diff = timePerBlock
-    // timePerDiff * newDiff = targetBlockTime    // swap out timePerBlock with the target, and diff with the new value
-    // newDiff = targetBlockTime / timePerDiff //isolate newDiff
-
-}
