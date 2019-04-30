@@ -194,7 +194,7 @@ fun minerMenu(){
 
     miner@ while(true) {
 
-        print("Miner: $")
+        print("Miner: $ ")
         when (val inn = scan.nextLine()) {
             "start" -> {
                 if(miner == null){

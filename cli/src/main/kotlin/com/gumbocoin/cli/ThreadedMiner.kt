@@ -90,12 +90,12 @@ class ThreadedMiner(private val socket: RSocket,
                     continue@root
                 }
                 if (update.isNotEmpty()) {
-//                    println("Updating block")
+                    println("Updating block")
                     block = MutableBlock(update.removeAt(0).newBlock)
                 }
 
                 val bblock = if (block == null) {
-//                    println("Block is null")
+                    println("Block is null")
                     Thread.sleep(sleepLength)
                     continue@root
                 } else {
@@ -115,7 +115,6 @@ class ThreadedMiner(private val socket: RSocket,
                             )
                         ).toBase64()
                     val realBlock = bblock.toBlock()
-                    block = null
                     val result = socket.requestResponse(
                         BlockDataBlob(
                             block = realBlock,

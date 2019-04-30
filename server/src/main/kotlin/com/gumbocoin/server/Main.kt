@@ -11,7 +11,6 @@ import java.time.Instant
 
 val targetBlockTime: Duration = Duration.ofMinutes(1)
 val blockInTheLast : Duration = Duration.ofMinutes(2)
-const val wantedBlocks = 2
 const val defaultDifficulty = 4L
 
 
@@ -54,16 +53,29 @@ val diff :Long
         // diff = ((diffsOverTime * wantedBlocks ) / blocks) / wantedBlocksOverTime
 
 
-        println("timedBlocks: $timedBlocks")
+        // diffsOverTime = 52
+        // blocksOverTime = 13
+        // wantedBlocksOverTime = 8
+        // diff = diffsOverTime / wantedBlocksOverTime
+        val time =  Duration.between(Instant.ofEpochMilli(timedBlocks.first().timestamp),
+            Instant.ofEpochMilli(timedBlocks.last().timestamp)).abs()
+
+        println("Time: ${time.toMillis()}")
+        println("Target time block time: ${targetBlockTime.toMillis()}")
+        println("blockInTheLast: ${blockInTheLast.toMillis()}")
+        if(time.toMillis() < targetBlockTime.toMillis()){
+            println("Not enough time has passed")
+            return defaultDifficulty
+        }
+        val wantedBlocks = time.toMillis() / targetBlockTime.toMillis()
+        println("Wanted blocks:$wantedBlocks")
         val diffsOverTime = timedBlocks.fold(0L) { a,b -> a + b.difficulty }
         println("Diffs over time: $diffsOverTime")
         val blocksOverTime = timedBlocks.size
         println("BLocks over time: $blocksOverTime")
         println("Wanted blocks over time:$wantedBlocks")
-        val wantedDiffsOverTime = (diffsOverTime * wantedBlocks) / blocksOverTime
-        println("wantedDiffsOverTime:$wantedDiffsOverTime")
-        val newDiff = wantedDiffsOverTime / wantedBlocks
 
+        val newDiff = diffsOverTime / wantedBlocks
         println("newDiff: $newDiff")
         return if(newDiff > 3)
             newDiff
