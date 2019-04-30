@@ -7,10 +7,11 @@ import systems.carson.base.Information
 import java.time.Duration
 import java.util.*
 
-class DiscordLogger :GLog{
-    fun setLevel(level :GLevel){
+class DiscordLogger : GLog {
+    fun setLevel(level: GLevel) {
         levelI = level
     }
+
     override val level: GLevel
         get() = levelI
     private var levelI = GLevel.WARNING
@@ -22,20 +23,21 @@ class DiscordLogger :GLog{
     override fun log(information: Information) {
         val name = information.nameOfLogger
         val message =
-                (if(information.level == GLevel.FATAL) "<@293853365891235841> " else "") +
-                information.level.toString() + "" +
-                (if(name == null) ":" else " - $name:") +
-                information.message
+            (if (information.level == GLevel.FATAL) "<@293853365891235841> " else "") +
+                    information.level.toString() + "" +
+                    (if (name == null) ":" else " - $name:") +
+                    information.message
 //        println("Adding $message to cache")
         synchronized(lock) {
             cache.add(message)
         }
     }
+
     val sub =
         Flux.interval(Duration.ofSeconds(1))
             .map {
                 synchronized(lock) {
-//                    println("Mapping $cache")
+                    //                    println("Mapping $cache")
                     if (cache.isEmpty()) {
                         Optional.empty()
                     } else {

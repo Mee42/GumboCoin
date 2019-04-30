@@ -10,7 +10,7 @@ import java.time.Duration
 import java.time.Instant
 
 val targetBlockTime: Duration = Duration.ofMinutes(1)
-val blockInTheLast : Duration = Duration.ofMinutes(2)
+val blockInTheLast: Duration = Duration.ofMinutes(2)
 const val defaultDifficulty = 4L
 
 
@@ -23,17 +23,22 @@ var blockchain: Blockchain =
         )
     )
 
-val diff :Long
-    get(){
-        if(blockchain.blocks.size < 5)
+val diff: Long
+    get() {
+        if (blockchain.blocks.size < 5)
             return defaultDifficulty
 
 //        val lastFiveBlocks = blockchain.blocks.subList(blockchain.blocks.size - 5,blockchain.blocks.size)
 
 
-        val timedBlocks = blockchain.blocks.filter { Duration.between(Instant.ofEpochMilli(it.timestamp), Instant.now()).abs().toMillis() < blockInTheLast.toMillis() }
+        val timedBlocks = blockchain.blocks.filter {
+            Duration.between(
+                Instant.ofEpochMilli(it.timestamp),
+                Instant.now()
+            ).abs().toMillis() < blockInTheLast.toMillis()
+        }
 
-        if(timedBlocks.size <= 1){
+        if (timedBlocks.size <= 1) {
             //if there are no blocks, either no one is mining or no one has mined anything in the last hour
             // just don't change diff. It's not worth the time
             return blockchain.blocks.last().difficulty//don't change it
@@ -57,19 +62,21 @@ val diff :Long
         // blocksOverTime = 13
         // wantedBlocksOverTime = 8
         // diff = diffsOverTime / wantedBlocksOverTime
-        val time =  Duration.between(Instant.ofEpochMilli(timedBlocks.first().timestamp),
-            Instant.ofEpochMilli(timedBlocks.last().timestamp)).abs()
+        val time = Duration.between(
+            Instant.ofEpochMilli(timedBlocks.first().timestamp),
+            Instant.ofEpochMilli(timedBlocks.last().timestamp)
+        ).abs()
 
         println("Time: ${time.toMillis()}")
         println("Target time block time: ${targetBlockTime.toMillis()}")
         println("blockInTheLast: ${blockInTheLast.toMillis()}")
-        if(time.toMillis() < targetBlockTime.toMillis()){
+        if (time.toMillis() < targetBlockTime.toMillis()) {
             println("Not enough time has passed")
             return defaultDifficulty
         }
         val wantedBlocks = time.toMillis() / targetBlockTime.toMillis()
         println("Wanted blocks:$wantedBlocks")
-        val diffsOverTime = timedBlocks.fold(0L) { a,b -> a + b.difficulty }
+        val diffsOverTime = timedBlocks.fold(0L) { a, b -> a + b.difficulty }
         println("Diffs over time: $diffsOverTime")
         val blocksOverTime = timedBlocks.size
         println("BLocks over time: $blocksOverTime")
@@ -77,7 +84,7 @@ val diff :Long
 
         val newDiff = diffsOverTime / wantedBlocks
         println("newDiff: $newDiff")
-        return if(newDiff > 3)
+        return if (newDiff > 3)
             newDiff
         else {
             System.out.println("newDiff is <= 3")
@@ -158,7 +165,7 @@ fun main() {
     discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
 
-    logger.log(GLevel.IMPORTANT,"Server started. Mode: ${ReleaseManager.release}")
+    logger.log(GLevel.IMPORTANT, "Server started. Mode: ${ReleaseManager.release}")
 
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()

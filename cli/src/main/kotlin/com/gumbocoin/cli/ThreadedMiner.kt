@@ -15,23 +15,25 @@ import kotlin.concurrent.thread
 class Update(val newBlock: Block)
 
 
-class ThreadedMiner(private val socket: RSocket,
-                    private val loggger : GLogger = GLogger.logger("Miner"),
-                    private val person :Person,
-                    private val clientID :String,
-                    sleep: Long = 100) {
+class ThreadedMiner(
+    private val socket: RSocket,
+    private val loggger: GLogger = GLogger.logger("Miner"),
+    private val person: Person,
+    private val clientID: String,
+    sleep: Long = 100
+) {
 
 
     private var running = false
-    val isRunning :Boolean
+    val isRunning: Boolean
         get() = running
     private val update = Collections.synchronizedList(mutableListOf<Update>())
     private var exit = false
     private var sleepLength = sleep
     var statuses = mutableListOf<Status>()
-    val mined :Int
+    val mined: Int
         get() = statuses.count { !it.failed }
-    val failed :Int
+    val failed: Int
         get() = statuses.count { it.failed }
 
     fun start() {
@@ -39,7 +41,7 @@ class ThreadedMiner(private val socket: RSocket,
     }
 
 
-    fun stop(){
+    fun stop() {
         running = false
     }
 
@@ -57,7 +59,7 @@ class ThreadedMiner(private val socket: RSocket,
     }
 
     init {
-        socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID),me)
+        socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID), me)
             .map { Sendable.fromJson<ActionUpdate>(it) }
             .map {
                 update(

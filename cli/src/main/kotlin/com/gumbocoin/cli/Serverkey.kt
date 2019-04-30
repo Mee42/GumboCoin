@@ -1,7 +1,8 @@
 package com.gumbocoin.cli
 
 import systems.carson.base.Person
-import systems.carson.base.Release.*
+import systems.carson.base.Release.BETA
+import systems.carson.base.Release.DEV
 import systems.carson.base.ReleaseManager
 
 val server = (mapOf(

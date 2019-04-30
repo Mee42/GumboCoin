@@ -30,18 +30,18 @@ fun main() {
 
     (0..2).forEach {
         time("Ping-$it") {
-            socket.requestResponse(RequestDataBlob(Request.Response.PING, clientID),me).block()
+            socket.requestResponse(RequestDataBlob(Request.Response.PING, clientID), me).block()
         }
     }
 
-    socket.requestResponse(SignUpDataBlob(clientID, me.publicKeyBase64()),me)
+    socket.requestResponse(SignUpDataBlob(clientID, me.publicKeyBase64()), me)
         .mapFromJson<Status>()
         .printStatus("Registered successfully")
         .block()
 
-    val threadedMiner = ThreadedMiner(socket, GLogger.logger("Miner"),me,clientID)
+    val threadedMiner = ThreadedMiner(socket, GLogger.logger("Miner"), me, clientID)
 
-    socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID),me)
+    socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID), me)
         .map { Sendable.fromJson<ActionUpdate>(it) }
         .map {
             println("Updating: ${serialize(it.actions)}")
@@ -62,41 +62,45 @@ fun main() {
 
     threadedMiner.mineAbout(3)
 
-    socket.requestResponse(StringDataBlob(clientID, clientID,Request.Response.MONEY.intent),me)
+    socket.requestResponse(StringDataBlob(clientID, clientID, Request.Response.MONEY.intent), me)
         .map { Sendable.fromJson<SendableInt>(it) }
         .map { println("Money:${it.value}") }
         .block()
 
-    socket.requestResponse(TransactionDataBlob(
-        clientID,
-        TransactionAction.sign(
-            clientID = clientID,
-            recipientID = "server",
-            amount = 2,
-            person = me
-        )
-    ),me)
+    socket.requestResponse(
+        TransactionDataBlob(
+            clientID,
+            TransactionAction.sign(
+                clientID = clientID,
+                recipientID = "server",
+                amount = 2,
+                person = me
+            )
+        ), me
+    )
         .map { Sendable.fromJson<Status>(it) }
         .printStatus("Transaction successful")
         .block()
 
     threadedMiner.mineAbout(3)
 
-    socket.requestResponse(DataSubmissionDataBlob(
-        clientID = clientID,
-        action = DataAction.sign(
+    socket.requestResponse(
+        DataSubmissionDataBlob(
             clientID = clientID,
-            data = DataPair("name","Carson Graham"),
-            person = me
-        )
-    ),me)
+            action = DataAction.sign(
+                clientID = clientID,
+                data = DataPair("name", "Carson Graham"),
+                person = me
+            )
+        ), me
+    )
         .map { Sendable.fromJson<Status>(it) }
         .printStatus("Data submission successful")
         .block()
 
     threadedMiner.mineAbout(3)
 
-    socket.requestResponse(StringDataBlob(clientID, clientID,Request.Response.MONEY.intent),me)
+    socket.requestResponse(StringDataBlob(clientID, clientID, Request.Response.MONEY.intent), me)
         .map { Sendable.fromJson<SendableInt>(it) }
         .map { println("Money:${it.value}") }
         .block()
@@ -108,7 +112,7 @@ fun main() {
     threadedMiner.exit()
 }
 
-fun ThreadedMiner.mineAbout(i :Int){
+fun ThreadedMiner.mineAbout(i: Int) {
     start()
     toFlux()
         .take(i.toLong())

@@ -7,17 +7,17 @@ import kotlin.reflect.KProperty
 
 private val pool = Executors.newCachedThreadPool()
 
-class KindaLazy<T>(initializer: () -> T){
+class KindaLazy<T>(initializer: () -> T) {
 
-    private var value :T? = null
-    private val thread : Future<*>
+    private var value: T? = null
+    private val thread: Future<*>
 
     init {
         thread = pool.submit { value = initializer() }
     }
 
-    operator fun getValue(thisRef :Any?,property : KProperty<*>):T{
-        if(value == null)
+    operator fun getValue(thisRef: Any?, property: KProperty<*>): T {
+        if (value == null)
             thread.get()
         return value!!
     }
