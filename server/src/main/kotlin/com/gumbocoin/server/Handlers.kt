@@ -1,5 +1,8 @@
 package com.gumbocoin.server
 
+import discord4j.common.json.EmojiResponse
+import discord4j.core.DiscordClient
+import discord4j.core.`object`.util.Snowflake
 import io.rsocket.Payload
 import reactor.core.publisher.Flux
 import reactor.core.publisher.toFlux
@@ -121,6 +124,7 @@ enum class ResponseHandler(
                                 )
                             }
                             is TransactionAction -> {
+
 //                            println("===")
 //                            val gbc = DiscordManager.client
 //                                .getGuildEmojiById(Snowflake.of(566998443218960434),Snowflake.of(572065175818076200))
@@ -135,6 +139,7 @@ enum class ResponseHandler(
                     spec.setAuthor("Block ${blockchain.blocks.size - 1}", "", "")
                 }
             }
+
             .subscribe()
         Status().toPayload()
     }),
