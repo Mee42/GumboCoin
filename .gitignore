@@ -2,7 +2,7 @@
 keys/
 .idea/
 website
-.gc.key
+*.gc.key
 tmp/
 # Created by https://www.gitignore.io/api/node,java,gradle,kotlin,intellij
 # Edit at https://www.gitignore.io/?templates=node,java,gradle,kotlin,intellij
