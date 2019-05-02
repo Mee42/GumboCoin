@@ -9,9 +9,9 @@ import java.nio.charset.Charset
 import java.time.Duration
 import java.time.Instant
 
-val targetBlockTime: Duration = Duration.ofMinutes(1)
-val blockInTheLast: Duration = Duration.ofMinutes(2)
+val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
 const val defaultDifficulty = 4L
+const val blocksToTake = 25
 
 
 var blockchain: Blockchain =
@@ -25,73 +25,19 @@ var blockchain: Blockchain =
 
 val diff: Long
     get() {
-        if (blockchain.blocks.size < 5)
+
+        if (blockchain.blocks.size < blocksToTake)//start out like this and get a feel for the power
             return defaultDifficulty
-
-//        val lastFiveBlocks = blockchain.blocks.subList(blockchain.blocks.size - 5,blockchain.blocks.size)
-
-
-        val timedBlocks = blockchain.blocks.filter {
-            Duration.between(
-                Instant.ofEpochMilli(it.timestamp),
-                Instant.now()
-            ).abs().toMillis() < blockInTheLast.toMillis()
-        }
-
-        if (timedBlocks.size <= 1) {
-            //if there are no blocks, either no one is mining or no one has mined anything in the last hour
-            // just don't change diff. It's not worth the time
-            return blockchain.blocks.last().difficulty//don't change it
-        }
-
-        //  diffsOverTime = sum { it -> it.diff }
-        //  blocksOverTime = count()
-        //  wantedBlocksOverTime = constant
-
-        //  diffsOverTime      wantedDiffsOverTime
-        // ---------------  = ---------------------
-        //  blocksOverTime     wantedBlocksOverTime
-
-        // wantedDiffsOverTime = (diffsOverTime * wantedBlocksOverTime) / blocksOverTime
-        // diff = wantedDiffsOverTime / wantedBlocksOverTime
-
-        // diff = ((diffsOverTime * wantedBlocks ) / blocks) / wantedBlocksOverTime
-
-
-        // diffsOverTime = 52
-        // blocksOverTime = 13
-        // wantedBlocksOverTime = 8
-        // diff = diffsOverTime / wantedBlocksOverTime
-        val time = Duration.between(
-            Instant.ofEpochMilli(timedBlocks.first().timestamp),
-            Instant.ofEpochMilli(timedBlocks.last().timestamp)
-        ).abs()
-
-        println("Time: ${time.toMillis()}")
-        println("Target time block time: ${targetBlockTime.toMillis()}")
-        println("blockInTheLast: ${blockInTheLast.toMillis()}")
-        if (time.toMillis() < targetBlockTime.toMillis()) {
-            println("Not enough time has passed")
-            return defaultDifficulty
-        }
-        val wantedBlocks = time.toMillis() / targetBlockTime.toMillis()
-        println("Wanted blocks:$wantedBlocks")
-        val diffsOverTime = timedBlocks.fold(0L) { a, b -> a + b.difficulty }
-        println("Diffs over time: $diffsOverTime")
-        val blocksOverTime = timedBlocks.size
-        println("BLocks over time: $blocksOverTime")
-        println("Wanted blocks over time:$wantedBlocks")
-
-        val newDiff = diffsOverTime / wantedBlocks
-        println("newDiff: $newDiff")
-        return if (newDiff > 3)
-            newDiff
-        else {
-            System.out.println("newDiff is <= 3")
-            4L
-        }
+        val lastFiveBLocks = blockchain.blocks.subList(blockchain.blocks.size - blocksToTake,blockchain.blocks.size)
+        val time:Duration = Duration
+            .between(Instant.ofEpochMilli(lastFiveBLocks.first().timestamp),
+                Instant.ofEpochMilli(lastFiveBLocks.last().timestamp))
+            .abs()//make sure it's positive
+        val averageDiffs = lastFiveBLocks.map { it.difficulty }.average().toLong()
+        val averageTimeBetweenBlocks:Duration = time.dividedBy(blocksToTake.toLong() - 1)
+        val averageTimePerDiff:Duration = averageTimeBetweenBlocks.dividedBy(averageDiffs)
+        return targetTimeBetweenBlocks.toMillis() / averageTimePerDiff.toMillis()
     }
-
 
 val logger = GLogger.logger()
 

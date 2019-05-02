@@ -92,12 +92,12 @@ class ThreadedMiner(
                     continue@root
                 }
                 if (update.isNotEmpty()) {
-                    println("Updating block")
+//                    println("Updating block")
                     block = MutableBlock(update.removeAt(0).newBlock)
                 }
 
                 val bblock = if (block == null) {
-                    println("Block is null")
+//                    println("Block is null")
                     Thread.sleep(sleepLength)
                     continue@root
                 } else {

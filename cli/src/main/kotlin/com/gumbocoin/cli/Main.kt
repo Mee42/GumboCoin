@@ -4,11 +4,14 @@ import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.Flux
+import reactor.util.function.Tuple2
 import systems.carson.base.*
 import java.io.File
 import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
+import java.util.concurrent.TimeUnit
+import javax.naming.TimeLimitExceededException
 
 val scan = Scanner(System.`in`)
 
@@ -200,6 +203,9 @@ fun runStep(input: String) {
     }
 }
 
+val queue = ArrayDeque<String>()
+var isPolling = false
+
 fun minerMenu() {
 
     miner@ while (true) {
@@ -252,14 +258,44 @@ fun minerMenu() {
                         .forEach { println(it) }
                 }
                 println(
-                    "Percent accepted:${m.mined.toDouble().div(m.failed.toDouble().plus(m.mined.toDouble())).times(
-                        100
-                    )}%"
+                    "Percent accepted:${m.mined.toDouble().div(m.failed.toDouble().plus(m.mined.toDouble())) * 100}%"
                 )
             }
+            "feed" -> {
+                val m = miner
+                if (m == null) {
+                    println("You haven't started the miner yet")
+                    continue@miner
+                }
+                while(queue.poll() != null){}
+                if(!isPolling) {
+                    m.toFlux()
+                        .map { (block, status) ->
+                            if (status.failed)
+                                "Block failed: " + status.errorMessage +
+                                        (if (status.extraData.isNotBlank()) "\n    " + status.extraData else "")
+                            else
+                                "Block Added!    ${block.hash}"
+                        }
+                        .subscribe { queue.add(it) }
+                    isPolling = true
+                }
+                print(">")
+                loop@ while(true){
+                    val x = TimeLimitedCodeBlock.runWithTimeout( { scan.hasNextLine() },10L, TimeUnit.MILLISECONDS)
+                    if(x.isPresent && x.get()){
+                        scan.nextLine()//consume the newline
+                        break@loop
+                    }
+                    val element = queue.poll()
+                    element?.let { print("\r$it\n>") }
+                }
+            }
+
             "back", "exit" -> {
                 return
             }
+            "" -> {}
             else -> {
                 println("Unknown miner command \"$inn\"")
             }
