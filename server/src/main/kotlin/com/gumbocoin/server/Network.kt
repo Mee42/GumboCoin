@@ -13,100 +13,141 @@ import java.nio.charset.Charset
 
 
 //fun toPayload(string :String):Payload = DefaultPayload.create(string)
-fun String.toPayload():Payload = DefaultPayload.create(this)
+fun String.toPayload(): Payload = DefaultPayload.create(this)
 
 
-fun isValid(message: Message):Boolean{
-    val people = blockchain.users.map { it.id to it.person }.toMap()
-    if(!people.containsKey(message.clientID))
+fun isValid(message: Message): Boolean {
+    val people = blockchain.users.map { it.id to it.person }.toMap() +
+            dataCache.filter { it.type == ActionType.SIGN_UP }
+                .map { it as SignUpAction }
+                .map { it.clientID to Person.fromPublicKey(it.publicKey) }
+                .toMap()
+    if (!people.containsKey(message.clientID))
         return false
     val data = message.encryptedData.toBytes().concat()
     val sig = Signature.fromBase64(message.signature)
     val person = people.getOrElse(message.clientID) { error("fuk") }
-    return Person.verify(person,sig,data)
+    return Person.verify(person, sig, data)
 }
 
-
-operator fun <T1,T2> Tuple2<T1,T2>.component1():T1{
-    return t1
-}
-operator fun <T1,T2> Tuple2<T1,T2>.component2():T2{
-    return t2
-}
-operator fun <T1,T2,T3> Tuple3<T1,T2,T3>.component3():T3{
-    return t3
-}
-operator fun <T1,T2,T3,T4> Tuple4<T1, T2, T3, T4>.component4():T4{
-    return t4
-}
 
 private val networkLogger = GLogger.logger("Network")
 
-private fun Mono<Tuple2<String,Payload>>.encryptBackToPerson():Mono<Payload> =
-    map { (clientID, payload ) ->
-        Tuples.of(if(payload.hasMetadata()) payload.metadataUtf8 else "",payload.data.array(),clientID) }
+private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
+    map { (clientID, payload) ->
+        Tuples.of(if (payload.hasMetadata()) payload.metadataUtf8 else "", payload.data.array(), clientID)
+    }
 
         .map { tuple ->
-            networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple }
+            networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple
+        }
 
-        .map { (meta, data,clientID) ->
-            Tuples.of(meta,Person.encryptAES(data,blockchain.users.map { it.id to it.person }.toMap().getOrDefault(clientID,Person.default))) }
+        .map { (meta, data, clientID) ->
+            Tuples.of(
+                meta,
+                Person.encryptAES(
+                    data,
+                    blockchain.users.map { it.id to it.person }.toMap().getOrDefault(clientID, Person.default)
+                )
+            )
+        }
 
-        .map { (meta,encrypted) ->
-            Tuples.of(meta, serialize(encrypted.toStrings())) }
+        .map { (meta, encrypted) ->
+            Tuples.of(meta, serialize(encrypted.toStrings()))
+        }
 
         .map { tuple -> networkLogger.debug("encrypted:$tuple");tuple }
 
         .map { tuple -> networkLogger.debug(tuple.t2);tuple }
 
         .map { (meta, data) ->
-            if(meta == "")
+            if (meta == "")
                 DefaultPayload.create(data)
             else
-                DefaultPayload.create(data,Charset.forName("UTF-8"),meta,Charset.forName("UTF-8"))
+                DefaultPayload.create(data, Charset.forName("UTF-8"), meta, Charset.forName("UTF-8"))
         }
-private fun Flux<Tuple2<String,Payload>>.encryptBackToPerson() :Flux<Payload> =
-        map { tuple -> Mono.just(tuple) }
-            .flatMap { it.encryptBackToPerson() }
+
+private fun Flux<Tuple2<String, Payload>>.encryptBackToPerson(): Flux<Payload> =
+    map { tuple -> Mono.just(tuple) }
+        .flatMap { it.encryptBackToPerson() }
 //            .flatMap/ { it }
 
-fun getResponseHandler(requestDataBlob: RequestDataBlob):(RequestDataBlob) -> Payload{
+fun getResponseHandler(requestDataBlob: RequestDataBlob): (RequestDataBlob) -> Payload {
     return ResponseHandler.values()
         .firstOrNull { it.request == Request.Response.values().first { w -> w.intent == requestDataBlob.intent } }
         ?.handler ?: error("Can't handle $requestDataBlob")
 }
-fun getStreamHandler(requestDataBlob: RequestDataBlob):(RequestDataBlob) -> Flux<Payload>{
+
+fun getStreamHandler(requestDataBlob: RequestDataBlob): (RequestDataBlob) -> Flux<Payload> {
     return StreamHandler.values()
         .firstOrNull { it.request == Request.Stream.values().first { w -> w.intent == requestDataBlob.intent } }
         ?.handler ?: error("Can't handle $requestDataBlob")
 }
 
 
-class MasterHandler :SocketAcceptor {
+class MasterHandler : SocketAcceptor {
     override fun accept(setup: ConnectionSetupPayload?, sendingSocket: RSocket?): Mono<RSocket> {
-        return Mono.just(object :AbstractRSocket(){
+        return Mono.just(object : AbstractRSocket() {
             override fun requestResponse(payload: Payload): Mono<Payload> {
                 return Mono.just(payload)
-                    .map { deserialize<Message>(it.dataUtf8)}
-                    .map { message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
-                    .map { (clientID, plaintextBlob, isValid) ->  Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
-                    .map { (clientID, blob, isValid) -> Tuples.of(clientID,deserialize<RequestDataBlob>(blob),isValid) }
+                    .map { deserialize<Message>(it.dataUtf8) }
+                    .map { message ->
+                        Tuples.of(
+                            message.clientID,
+                            KeyManager.server.decryptAES(message.encryptedData.toBytes()),
+                            isValid(message)
+                        )
+                    }
+                    .map { (clientID, plaintextBlob, isValid) ->
+                        Tuples.of(
+                            clientID,
+                            plaintextBlob.toString(Charset.forName("UTF-8")),
+                            isValid
+                        )
+                    }
+                    .map { (clientID, blob, isValid) ->
+                        Tuples.of(
+                            clientID,
+                            deserialize<RequestDataBlob>(blob),
+                            isValid
+                        )
+                    }
                     .map { tuple -> tuple.t2.isVerified = tuple.t3;tuple }
-                    .map { (clientID, blob) -> Tuples.of(clientID,getResponseHandler(blob).invoke(blob)) }
-                    .map { itt -> networkLogger.info("Sending back:${itt.t2.dataUtf8}");itt}
+                    .map { (clientID, blob) -> Tuples.of(clientID, getResponseHandler(blob).invoke(blob)) }
+                    .map { itt -> networkLogger.info("Sending back:${itt.t2.dataUtf8}");itt }
                     .encryptBackToPerson()
 
             }
 
             override fun requestStream(payload: Payload): Flux<Payload> {
                 return Mono.just(payload)
-                    .map { pay :Payload -> deserialize<Message>(pay.dataUtf8) }
-                    .map { message :Message -> Tuples.of(message.clientID,KeyManager.server.decryptAES(message.encryptedData.toBytes()),isValid(message)) }
-                    .map { (clientID,plaintextBlob,isValid) -> Tuples.of(clientID,plaintextBlob.toString(Charset.forName("UTF-8")),isValid) }
+                    .map { pay: Payload -> deserialize<Message>(pay.dataUtf8) }
+                    .map { message: Message ->
+                        Tuples.of(
+                            message.clientID,
+                            KeyManager.server.decryptAES(message.encryptedData.toBytes()),
+                            isValid(message)
+                        )
+                    }
+                    .map { (clientID, plaintextBlob, isValid) ->
+                        Tuples.of(
+                            clientID,
+                            plaintextBlob.toString(Charset.forName("UTF-8")),
+                            isValid
+                        )
+                    }
                     .map { networkLogger.info("stream    :" + it.t2);it }
-                    .map { (clientID, blob,isValid)-> Tuples.of(clientID,deserialize<RequestDataBlob>(blob),isValid) }
-                    .map { it.t2.isVerified = it.t3;Tuples.of(it.t1,it.t2) }
-                    .flatMapMany { (clientID, blob) -> getStreamHandler(blob).invoke(blob).map { Tuples.of(clientID,it) } }
+                    .map { (clientID, blob, isValid) ->
+                        Tuples.of(
+                            clientID,
+                            deserialize<RequestDataBlob>(blob),
+                            isValid
+                        )
+                    }
+                    .map { it.t2.isVerified = it.t3;Tuples.of(it.t1, it.t2) }
+                    .flatMapMany { (clientID, blob) ->
+                        getStreamHandler(blob).invoke(blob).map { Tuples.of(clientID, it) }
+                    }
                     .map { itt -> itt }
                     .encryptBackToPerson()
             }

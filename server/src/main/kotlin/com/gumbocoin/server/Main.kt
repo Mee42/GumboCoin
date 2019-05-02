@@ -1,24 +1,18 @@
 package com.gumbocoin.server
 
 
-import discord4j.core.DiscordClientBuilder
-import discord4j.core.`object`.entity.GuildChannel
-import discord4j.core.`object`.entity.TextChannel
-import discord4j.core.event.domain.message.MessageCreateEvent
-import discord4j.gateway.json.dispatch.MessageCreate
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
-import org.slf4j.LoggerFactory
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.nio.charset.Charset
-import kotlin.concurrent.thread
-import org.slf4j.spi.LocationAwareLogger
-import java.lang.reflect.AccessibleObject.setAccessible
+import java.time.Duration
+import java.time.Instant
 
+val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
+const val defaultDifficulty = 25L
+const val blocksToTake = 5
 
-
-const val diff = 4L
 
 var blockchain: Blockchain =
     Blockchain(
@@ -29,6 +23,22 @@ var blockchain: Blockchain =
         )
     )
 
+val diff: Long
+    get() {
+
+        if (blockchain.blocks.size < blocksToTake)//start out like this and get a feel for the power
+            return defaultDifficulty
+        val lastFiveBLocks = blockchain.blocks.subList(blockchain.blocks.size - blocksToTake,blockchain.blocks.size)
+        val time:Duration = Duration
+            .between(Instant.ofEpochMilli(lastFiveBLocks.first().timestamp),
+                Instant.ofEpochMilli(lastFiveBLocks.last().timestamp))
+            .abs()//make sure it's positive
+        val averageDiffs = lastFiveBLocks.map { it.difficulty }.average().toLong()
+        val averageTimeBetweenBlocks:Duration = time.dividedBy(blocksToTake.toLong() - 1)
+        val averageTimePerDiff:Duration = averageTimeBetweenBlocks.dividedBy(averageDiffs)
+        return targetTimeBetweenBlocks.toMillis() / averageTimePerDiff.toMillis()
+    }
+
 val logger = GLogger.logger()
 
 fun block(sig: String): Block {
@@ -37,7 +47,7 @@ fun block(sig: String): Block {
         actions = listOf(),
         timestamp = System.currentTimeMillis(),
         nonce = 0,
-        difficulty = diff,
+        difficulty = defaultDifficulty,
         lasthash = "null",
         signature = sig
     )
@@ -101,7 +111,7 @@ fun main() {
     discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
 
-    logger.log(GLevel.IMPORTANT,"Server started. Mode: ${ReleaseManager.release}")
+    logger.log(GLevel.IMPORTANT, "Server started. Mode: ${ReleaseManager.release}")
 
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()

@@ -1,25 +1,25 @@
 package systems.carson.base
 
-class Blockchain(val blocks: List<Block>):Sendable  {
+class Blockchain(val blocks: List<Block>) : Sendable {
 
     val users: List<User>
         get() = blocks
             .flatMap { it.actions }
             .filter { it.type == ActionType.SIGN_UP }
             .map { it as SignUpAction }
-            .map { User(it.clientID,Person.fromPublicKey(it.publicKey)) }
-    val amounts :Map<String,Int>
-        get(){
-            val map = mutableMapOf<String,Int>()
+            .map { User(it.clientID, Person.fromPublicKey(it.publicKey)) }
+    val amounts: Map<String, Int>
+        get() {
+            val map = mutableMapOf<String, Int>()
             blocks.flatMap { it.actions }
                 .filter { it.type == ActionType.TRANSACTION }
                 .map { it as TransactionAction }
                 .forEach {
-                    map[it.clientID] = map.getOrDefault(it.clientID,0) - it.amount
-                    map[it.recipientID] = map.getOrDefault(it.recipientID,0) + it.amount
+                    map[it.clientID] = map.getOrDefault(it.clientID, 0) - it.amount
+                    map[it.recipientID] = map.getOrDefault(it.recipientID, 0) + it.amount
                 }
             blocks.forEach {
-                map[it.author] = map.getOrDefault(it.author,0) + 1
+                map[it.author] = map.getOrDefault(it.author, 0) + 1
             }
 
             return map
@@ -28,7 +28,8 @@ class Blockchain(val blocks: List<Block>):Sendable  {
 
 class User(
     val id: String,
-    val person: Person)
+    val person: Person
+)
 
 data class Block(
     val author: String,
@@ -41,15 +42,15 @@ data class Block(
 ) {
     companion object
 
-    val hash :String
+    val hash: String
         get() {
-            if(hashLazy == null){
+            if (hashLazy == null) {
                 hashLazy = lazyOf(hash())
             }
             return hashLazy!!.value
         }
 
     @Transient
-    private var hashLazy :Lazy<String>? = lazy { hash() }
+    private var hashLazy: Lazy<String>? = lazy { hash() }
 
 }

@@ -21,8 +21,11 @@ dependencies {
 
     implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta4'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.8.0-beta4'
+    implementation group: 'commons-codec', name: 'commons-codec', version: '1.12'
+
 
 }
+
 
 compileKotlin {
     kotlinOptions.jvmTarget = "1.8"

@@ -9,11 +9,11 @@ import systems.carson.base.Release.*
 import systems.carson.base.ReleaseManager.release
 
 object DiscordManager {
-    val client :DiscordClient =
+    val client: DiscordClient =
         DiscordClientBuilder(KeyManager.discord).build()
 
 
-    val logChannel : Mono<TextChannel> by lazy {
+    val logChannel: Mono<TextChannel> by lazy {
         client.getChannelById(
             Snowflake.of(
                 logging[release]
@@ -21,9 +21,13 @@ object DiscordManager {
             )
         ).cast(TextChannel::class.java)
     }
-    val blockchainChannel:Mono<TextChannel> by lazy {
-        client.getChannelById(Snowflake.of(blockchain[release]
-            ?: error("Can't find blockchain channel for release $release")))
+    val blockchainChannel: Mono<TextChannel> by lazy {
+        client.getChannelById(
+            Snowflake.of(
+                blockchain[release]
+                    ?: error("Can't find blockchain channel for release $release")
+            )
+        )
             .cast(TextChannel::class.java)
     }
 

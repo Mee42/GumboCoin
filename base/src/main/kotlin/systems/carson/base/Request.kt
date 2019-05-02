@@ -1,7 +1,7 @@
 package systems.carson.base
 
-class Request{
-    enum class Response(val intent :String){
+class Request {
+    enum class Response(val intent: String) {
         PING("ping"),
         DECRYPT("decrypt"),
         VERIFIED("verified"),
@@ -12,7 +12,8 @@ class Request{
         MONEY("money"),
         DATA("data")
     }
-    enum class Stream(val intent :String){
+
+    enum class Stream(val intent: String) {
         NUMBERS("numbers"),
         BLOCKCHAIN_UPDATES("blockchain_updates")
     }

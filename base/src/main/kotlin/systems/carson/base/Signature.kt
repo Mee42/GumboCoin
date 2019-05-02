@@ -17,27 +17,31 @@ class Signature(val byteArray: ByteArray) {
     override fun hashCode(): Int {
         return byteArray.contentHashCode()
     }
-    fun toBase64() :String = Base64.encodeBase64String(byteArray)
-    companion object{
-        fun fromBase64(string :String):Signature = Signature(Base64.decodeBase64(string))
-        val VOID :Signature by lazy { Signature(ByteArray(0) { 0 }) }
+
+    fun toBase64(): String = Base64.encodeBase64String(byteArray)
+
+    companion object {
+        fun fromBase64(string: String): Signature = Signature(Base64.decodeBase64(string))
+        val VOID: Signature by lazy { Signature(ByteArray(0) { 0 }) }
     }
 }
 
-class EncryptedBytes(val iv :ByteArray, val encryptedSecretKey :ByteArray,val encryptedData :ByteArray){
-    fun toStrings():EncryptedString{
+class EncryptedBytes(val iv: ByteArray, val encryptedSecretKey: ByteArray, val encryptedData: ByteArray) {
+    fun toStrings(): EncryptedString {
         return EncryptedString(
             iv = Base64.encodeBase64String(iv),
             encryptedSecretKey = Base64.encodeBase64String(encryptedSecretKey),
             encryptedData = Base64.encodeBase64String(encryptedData)
         )
     }
-    fun concat():ByteArray{
+
+    fun concat(): ByteArray {
         return iv + encryptedSecretKey + encryptedData
     }
 }
-class EncryptedString(val iv :String, val encryptedSecretKey :String, val encryptedData :String) :Sendable{
-    fun toBytes():EncryptedBytes{
+
+class EncryptedString(val iv: String, val encryptedSecretKey: String, val encryptedData: String) : Sendable {
+    fun toBytes(): EncryptedBytes {
         return EncryptedBytes(
             iv = Base64.decodeBase64(iv),
             encryptedSecretKey = Base64.decodeBase64(encryptedSecretKey),

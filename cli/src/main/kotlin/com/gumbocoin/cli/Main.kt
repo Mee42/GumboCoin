@@ -1,249 +1,304 @@
 package com.gumbocoin.cli
 
-import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
-import reactor.core.publisher.DirectProcessor
+import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
-import reactor.core.publisher.toFlux
 import reactor.util.function.Tuple2
-import reactor.util.function.Tuples
 import systems.carson.base.*
+import java.io.File
 import java.nio.charset.Charset
+import java.time.Duration
 import java.util.*
-import kotlin.concurrent.thread
-import java.util.ArrayList
-import java.util.Collections.synchronizedList
+import java.util.concurrent.TimeUnit
+import javax.naming.TimeLimitExceededException
 
+val scan = Scanner(System.`in`)
 
-val logger = GLogger.logger()
-
-val network = GLogger.logger("Network")
-
-
-val me = Person.generateNew()
-val clientID = UUID.randomUUID().toString().split("-")[0]
-
-class MutableBlock(
-    var author: String,
-    var actions: List<Action>,
-    var timestamp: Long,
-    var nonce: Long,
-    var difficulty: Long,
-    var lasthash: String,
-    var signature: String
-) {
-    fun toBlock(): Block {
-        return Block(
-            author = author,
-            actions = actions,
-            timestamp = timestamp,
-            nonce = nonce,
-            difficulty = difficulty,
-            lasthash = lasthash,
-            signature = signature
-        )
-    }
-
-    constructor(b: Block) : this(
-        author = b.author,
-        actions = b.actions,
-        timestamp = b.timestamp,
-        nonce = b.nonce,
-        difficulty = b.difficulty,
-        lasthash = b.lasthash,
-        signature = b.signature
-    )
-
-    fun hash() = this.toBlock().hash()
-}
-
-inline fun <reified T> Mono<String>.mapFromJson(): Mono<T> = map { it.trimAESPadding() }
-    .map { deserialize<T>(it) }
+val socket = RSocketFactory.connect()
+    .transport(TcpClientTransport.create("localhost", PORT))
+    .start()
+    .block()!!
 
 fun main() {
-    println("STARTING CLI: MODE: ${ReleaseManager.release}")
-
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
 
-    val outputManager = OutputGLogger()
-    outputManager.setLevel(GLevel.INFO)
-    GManager.addLoggerImpl(outputManager)
+    Flux.interval(Duration.ofMinutes(1))
+        .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "defaultID"), Person.default) }
+        .subscribe()
 
-    val socket = RSocketFactory.connect()
-        .transport(TcpClientTransport.create("localhost", PORT))
-        .start()
-        .block()!!
+    while (true) {
+        print("G \$ ")
+        val input = scan.nextLine()
+        if (input == "exit") {
+            miner?.exit()
+            return
+        }
+        runStep(input)
+    }
+}
 
-    (0..2).forEach {
-        time("Ping-$it") { socket.requestResponse(RequestDataBlob(Request.Response.PING, clientID)).block() }
+class ErrorStatus private constructor(val failed: Boolean, val message: String? = null) {
+    companion object {
+        fun success(): ErrorStatus = ErrorStatus(false, null)
+        fun error(message: String): ErrorStatus = ErrorStatus(true, message)
+        fun error(): ErrorStatus = ErrorStatus(true, null)
+    }
+}
+
+fun Boolean.toError(message: String) = if (this) ErrorStatus.success() else ErrorStatus.error(message)
+
+fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.success() }): String {
+    print("$message:")
+    val input = scan.nextLine()
+    val status = isValid(input)
+    if (!status.failed)
+        return input
+    if (status.message != null)
+        System.err.println(status.message)
+    else
+        println("Invalid input")
+    return prompt(message, isValid)
+}
+
+var clientIDNullable: String? = null
+val clientID: String
+    get() {
+        if (loggedIn)
+            return clientIDNullable!!
+        error("Can't access clientID if not logged in")
+    }
+var meNullable: Person? = null
+val me: Person
+    get() {
+        if (loggedIn)
+            return meNullable!!
+        error("Can't access keys if not logged in")
     }
 
-    socket.requestResponse(SignUpDataBlob(clientID, me.publicKeyBase64()))
-        .mapFromJson<Status>()
-        .printStatus("Registered successfully")
-        .block()
+var loggedIn = false
 
-    val threadedMiner = ThreadedMiner(socket,GLogger.logger("Miner"))
 
-    socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID))
-        .map { Sendable.fromJson<ActionUpdate>(it) }
-        .map {
-            println("Updating: ${serialize(it.actions)}")
-            threadedMiner.update(
-                Update(
-                    Block(
-                        author = clientID,
-                        actions = it.actions,
-                        timestamp = System.currentTimeMillis(),
-                        nonce = Random().nextLong(),
-                        difficulty = it.difficulty,
-                        lasthash = it.lasthash,
-                        signature = ""
+var miner: ThreadedMiner? = null
+
+
+fun runStep(input: String) {
+    when (input) {
+        "" -> {
+        }
+        "login" -> {
+            //attempt to test the clientID
+            val keyFile = File(prompt("Keyfile") { it.isNotBlank().toError("Input can not be blank") })
+
+            val str = keyFile.name
+            var maybeID = str.replaceFirst(".gc.key", "")
+            if (!str.contains(".gc.key")) {
+                maybeID = ""
+            }
+            maybeID = if (maybeID.isNotBlank()) "($maybeID)" else ""
+
+            var clientID = prompt("Client ID $maybeID") {
+                if (maybeID.isNotBlank())
+                    ErrorStatus.success()
+                else
+                    it.isNotBlank().toError("Input can not be blank")
+            }
+            if (clientID.isBlank())
+                clientID = maybeID.substring(1, maybeID.length - 1)//I hate this code
+            clientID = clientID.trim()
+
+            val person = Person.fromKeyFile(keyFile.readText(Charset.forName("UTF-8")))
+
+            val result = socket.requestResponse(RequestDataBlob(Request.Response.VERIFIED, clientID), person)
+                .map { Sendable.fromJson<SendableBoolean>(it) }
+                .map { it.value }
+                .block()
+            if (result == true) {
+                println("Logged in successfully")
+                clientIDNullable = clientID
+                meNullable = person
+                loggedIn = true
+            } else {
+                println("Couldn't verify account. Login unsuccessful")
+            }
+            //TODO test
+        }
+        "signup" -> {
+            val clientID = DigestUtils.sha1Hex(UUID.randomUUID().toString()).substring(0, 10)
+            val keys = Person.generateNew()
+            println("Registering with the server... ClientID: $clientID")
+            val status = socket.requestResponse(
+                SignUpDataBlob(
+                    clientID = clientID,
+                    signUpAction = SignUpAction(
+                        clientID = clientID,
+                        publicKey = keys.publicKeyBase64()
                     )
-                )
+                ), keys
             )
-        }.subscribe()
-
-    threadedMiner.mineAbout(3)
-
-    socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
-        .map { Sendable.fromJson<SendableInt>(it) }
-        .map { println("Money:${it.value}") }
-        .block()
-
-    socket.requestResponse(TransactionDataBlob(
-        clientID,
-        TransactionAction.sign(
-            clientID = clientID,
-            recipientID = "server",
-            amount = 2,
-            person = me)
-    ))
-        .map { Sendable.fromJson<Status>(it) }
-        .printStatus("Transaction successful")
-        .block()
-
-    threadedMiner.mineAbout(3)
-
-    socket.requestResponse(DataSubmissionDataBlob(
-        clientID = clientID,
-        action = DataAction.sign(
-            clientID = clientID,
-            data = DataPair("name","Carson Graham"),
-            person = me
-        )
-    ))
-        .map { Sendable.fromJson<Status>(it) }
-        .printStatus("Data submission successful")
-        .block()
-
-    threadedMiner.mineAbout(3)
-
-    socket.requestResponse(StringDataBlob(clientID,clientID,Request.Response.MONEY.intent))
-        .map { Sendable.fromJson<SendableInt>(it) }
-        .map { println("Money:${it.value}") }
-        .block()
-
-    threadedMiner.stop()
-
-
-
-    threadedMiner.exit()
-}
-
-fun ThreadedMiner.mineAbout(i :Int){
-    start()
-    toFlux()
-        .take(i.toLong())
-        .blockLast()
-    stop()
-}
-
-class Update(val newBlock: Block)
-
-class ThreadedMiner(private val socket: RSocket,private val loggger : GLogger = GLogger.logger(), sleep: Long = 100) {
-
-
-    private var running = false
-    private val update = synchronizedList(mutableListOf<Update>())
-    private var exit = false
-    private var sleepLength = sleep
-
-    fun start() {
-        running = true
-    }
-
-
-    fun stop(){
-        running = false
-    }
-
-    fun exit() {
-        running = false; exit = true
-    }
-
-    fun update(u: Update) = update.add(u)
-
-    private val hot = DirectProcessor.create<Tuple2<Block, Status>>()
-
-    fun toFlux(): Flux<Tuple2<Block, Status>> {
-        return hot.toFlux()
-    }
-
-    init {
-        thread(start = true) {
-            var block: MutableBlock? = null
-            root@ while (true) {
-                if (exit) {
-//                    println("exiting")
-                    break@root
-                }
-                if (!running) {
-//                    println("not running :(")
-                    Thread.sleep(sleepLength)
-                    continue@root
-                }
-                if (update.isNotEmpty()) {
-                    println("Updating block")
-                    block = MutableBlock(update.removeAt(0).newBlock)
-                }
-                val bblock = if(block == null) {
-                    logger.debug("Block is null")
-                    Thread.sleep(sleepLength)
-                    continue@root
-                }else{
-                    block
-                }
-                val hash = bblock.hash()
-                if (hash.isValid()) {
-//                    println("Found valid hash: $hash")
-                    bblock.signature =
-                        me.sign(bblock.toBlock().excludeSignature().toByteArray(Charset.forName("UTF-8"))).toBase64()
-                    val realBlock = bblock.toBlock()
-                    block = null
-                    socket.requestResponse(
-                            BlockDataBlob(
-                                block = realBlock,
-                                clientID = clientID,
-                                intent = Request.Response.BLOCK.intent
-                            )
-                        )
-                        .map { Sendable.fromJson<Status>(it) }
-                        .printStatus("Block accepted successfully!   hash:${bblock.hash()}",loggger,debugSuccess = true)
-                        .map { hot.onNext(Tuples.of(realBlock, it)) }
-                        .block()
-
-//                    println("BLock accepted block done")
+                .mapFromJson<Status>()
+                .block()
+            if (status == null) {
+                println("Didn't get a response from the server")
+            } else {
+                if (status.failed) {
+                    println("Error:" + status.errorMessage)
+                    status.extraData.let { if (it.isBlank()) null else it }
+                        ?.let { println("Extra Data:$it") }
                 } else {
-                    bblock.nonce++
-//                    println("Invalid hash:$hash : ${bblock.hash()} : ${bblock.toBlock().hash()} : ${bblock.toBlock()}")
+                    println("Success")
+                    clientIDNullable = clientID
+                    meNullable = keys
+                    loggedIn = true
+                    var keyFile = prompt("Directory to store keys in (.)")
+                    if (keyFile.isBlank())
+                        keyFile = "./"
+                    if (!keyFile.endsWith("/"))
+                        keyFile = "$keyFile/"
+
+                    val file = File("$keyFile$clientID.gc.key")
+                    file.writeText(me.serialize(), Charset.forName("UTF-8"))
+                    println("Created file $keyFile$clientID.gs.key")
                 }
+            }
+
+        }
+        "money" -> {
+            if (!loggedIn) {
+                println("You need to be logged to get your balance")
+                return
+            }
+            val money = socket.requestResponse(
+                StringDataBlob(
+                    clientID = clientID,
+                    intent = Request.Response.MONEY.intent,
+                    value = clientID
+                ), me
+            )
+                .mapFromJson<SendableInt>()
+                .block()?.value ?: -1
+            println("$clientID has $money Gumbocoin" + if (money == 1) "" else "s")
+
+        }
+        "miner" -> {
+            if (!loggedIn) {
+                println("Can't startup the miner without logging in")
+                return
+            }
+            minerMenu()
+        }
+        "help" -> {
+            """
+            login   |  log in
+            signup  |  make a new Gumbocoin account
+            money   |  find out how many Gumbocoins you have
+            miner   |  control the miner
+            help    |  print this menu
+            exit    |  exit
+        """.trimIndent()
+        }
+        else -> {
+            println("Unknown command \"$input\"")
+        }
+    }
+}
+
+val queue = ArrayDeque<String>()
+var isPolling = false
+
+fun minerMenu() {
+
+    miner@ while (true) {
+
+        print("Miner: $ ")
+        when (val inn = scan.nextLine()) {
+            "start" -> {
+                if (miner == null) {
+                    miner = ThreadedMiner(
+                        socket = socket,
+                        person = me,
+                        clientID = clientID
+                    )
+                }
+                println("Starting miner")
+                miner?.start() ?: println("Error starting miner")
+
+            }
+            "stop" -> {
+                if (miner == null || !miner!!.isRunning) {
+                    println("Miner is not running, can't stop it")
+                } else {
+                    println("Stopping miner")
+                    miner?.stop() ?: println("Error stopping miner...")
+                }
+            }
+            "help" -> {
+                """
+                        You are in the mining menu!
+                        There are only a few simple comamnds:
+                        start  |   starts the miner
+                        stop   |   stops the miner
+                        back   |   exit the miner menu and return to the main prompt
+                        status |   get the status of the miner
+
+                    """.trimIndent().let { println(it) }
+            }
+            "status" -> {
+                val m = miner
+                if (m == null) {
+                    println("You haven't started the miner yet")
+                    continue@miner
+                }
+                println("Blocks mined:${m.mined}")
+                println("Rejected blocks:${m.failed}")
+                if (m.failed != 0) {
+                    println("Last 5 errors:")
+                    m.statuses.filter { it.failed }
+                        .map { it.errorMessage + if (it.extraData.isNotBlank()) " - " + it.extraData else "" }
+                        .forEach { println(it) }
+                }
+                println(
+                    "Percent accepted:${m.mined.toDouble().div(m.failed.toDouble().plus(m.mined.toDouble())) * 100}%"
+                )
+            }
+            "feed" -> {
+                val m = miner
+                if (m == null) {
+                    println("You haven't started the miner yet")
+                    continue@miner
+                }
+                while(queue.poll() != null){}
+                if(!isPolling) {
+                    m.toFlux()
+                        .map { (block, status) ->
+                            if (status.failed)
+                                "Block failed: " + status.errorMessage +
+                                        (if (status.extraData.isNotBlank()) "\n    " + status.extraData else "")
+                            else
+                                "Block Added!    ${block.hash}"
+                        }
+                        .subscribe { queue.add(it) }
+                    isPolling = true
+                }
+                print(">")
+                loop@ while(true){
+                    val x = TimeLimitedCodeBlock.runWithTimeout( { scan.hasNextLine() },10L, TimeUnit.MILLISECONDS)
+                    if(x.isPresent && x.get()){
+                        scan.nextLine()//consume the newline
+                        break@loop
+                    }
+                    val element = queue.poll()
+                    element?.let { print("\r$it\n>") }
+                }
+            }
+
+            "back", "exit" -> {
+                return
+            }
+            "" -> {}
+            else -> {
+                println("Unknown miner command \"$inn\"")
             }
         }
     }
-
-
 }
-
