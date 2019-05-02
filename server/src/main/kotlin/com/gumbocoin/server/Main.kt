@@ -41,18 +41,6 @@ val diff: Long
 
 val logger = GLogger.logger()
 
-fun block(sig: String): Block {
-    return Block(
-        author = "server",
-        actions = listOf(),
-        timestamp = System.currentTimeMillis(),
-        nonce = 0,
-        difficulty = defaultDifficulty,
-        lasthash = "null",
-        signature = sig
-    )
-}
-
 val dataCache: MutableList<Action> = mutableListOf()
 
 fun addToDataCache(action: Action) {
