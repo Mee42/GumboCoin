@@ -1,8 +1,5 @@
 package com.gumbocoin.server
 
-import discord4j.common.json.EmojiResponse
-import discord4j.core.DiscordClient
-import discord4j.core.`object`.util.Snowflake
 import io.rsocket.Payload
 import reactor.core.publisher.Flux
 import reactor.core.publisher.toFlux
@@ -229,24 +226,25 @@ enum class ResponseHandler(
         val user = blockchain
             .users
             .firstOrNull { it.id == action.clientID } ?: return@req Status(failed = true, errorMessage = "Couldn't find public key").toPayload()
-        if(!action.verifySignature(user.person))
+
+        val dataPair = blockchain
+            .blocks
+            .flatMap { it.actions }
+            .filter { it.type == ActionType.DATA }
+            .map { it as DataAction }
+            .firstOrNull { it.data.uniqueID == pay.action.dataID } ?: return@req Status(failed = true, errorMessage = "Can't find the data for the unique ID",
+            extraData = "Unique ID:${pay.action.dataID}").toPayload()
+
+        val verified = Person.verify(
+            user.person,
+            Signature.fromBase64(pay.action.signature),
+            dataPair.toSingableString().toByteArray(Charset.forName("UTF-8")))
+
+        if(!verified)
             return@req Status(failed = true,
                 errorMessage = "Action is not properly signed",
                 extraData = "").toPayload()
-        val dataItsSigning =
-            blockchain
-                .blocks
-                .flatMap { it.actions }
-                .filter { it.type == ActionType.DATA }
-                .map { it as DataAction }
-                .firstOrNull { it.data.uniqueID == action.dataPair.uniqueID }
-                ?: return@req Status(failed = true, errorMessage = "Can't find data with ID ${action.dataPair.uniqueID}").toPayload()
-        if(dataItsSigning.data == action.dataPair)
-            return@req Status(
-                failed = true,
-                errorMessage = "Data isn't equal",
-                extraData = "existing:${dataItsSigning.data} got ${action.dataPair}"
-            ).toPayload()
+
         //I think it's good....hopefully?
         addToDataCache(action)
         Status().toPayload()

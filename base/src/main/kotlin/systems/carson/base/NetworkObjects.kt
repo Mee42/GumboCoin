@@ -136,35 +136,8 @@ data class TransactionAction(val clientID: String, val recipientID: String, val 
 }
 
 data class VerifyAction(val clientID :String,
-                        val dataPair :DataPair,
-                        val signature :String) :Action(ActionType.VERIFY){
-    fun verifySignature(person :Person):Boolean{
-        return verifySignature(person.publicKey)
-    }
-    fun verifySignature(publicKey: PublicKey):Boolean{
-        return Person.verify(publicKey,Signature.fromBase64(signature),concat())
-    }
-
-    private class Tmp(
-        val clientID :String,
-        val dataPair: DataPair)
-
-    private fun concat():ByteArray{
-        return concat(clientID,dataPair)
-    }
-    companion object{
-        private fun concat(clientID: String,data: DataPair):ByteArray{
-            return serialize(Tmp(clientID,data)).toByteArray(Charset.forName("UTF-8"))
-        }
-        fun sign(clientID: String, data :DataPair, person :Person):VerifyAction{
-            return VerifyAction(
-                clientID = clientID,
-                dataPair = data,
-                signature = person.sign(concat(clientID,data)).toBase64()
-            )
-        }
-    }
-}
+                        val dataID :String,
+                        val signature :String) :Action(ActionType.VERIFY)
 
 class VerifyActionBlob(clientID :String, val action :VerifyAction) :RequestDataBlob(
     Request.Response.VERIFY.intent,
@@ -185,8 +158,8 @@ data class DataAction(
     val signature: String
 ) : Action(ActionType.DATA) {
 
-    private fun toSingableString(): String {
-        return clientID + data.toString()
+    fun toSingableString(): String {
+        return clientID + serialize(data)
     }
 
     fun isSignatureValid(publicKey: PublicKey): Boolean {
@@ -196,7 +169,6 @@ data class DataAction(
             this.toSingableString().toByteArray(Charset.forName("UTF-8"))
         )
     }
-
     companion object {
         fun sign(clientID: String, data: DataPair, person: Person): DataAction {
             return DataAction(

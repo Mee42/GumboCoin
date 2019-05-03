@@ -65,7 +65,7 @@ object GsonHolder {
                         )
                         ActionType.VERIFY -> VerifyAction(
                             clientID = clientID,
-                            dataPair = obj.obj("dataPair",context),
+                            dataID = obj.str("dataID"),
                             signature = obj.str("signature")
                         )
                     }
