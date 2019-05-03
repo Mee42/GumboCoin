@@ -4,14 +4,14 @@ import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.Flux
-import reactor.util.function.Tuple2
+import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.io.File
 import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
-import javax.naming.TimeLimitExceededException
 
 val scan = Scanner(System.`in`)
 
@@ -163,9 +163,19 @@ fun runStep(input: String) {
             }
 
         }
+        "browse" -> {
+            browseActions()
+        }
+        "verify" -> {
+            if (!loggedIn) {
+                println("You need to be logged in")
+                return
+            }
+            verify()
+        }
         "money" -> {
             if (!loggedIn) {
-                println("You need to be logged to get your balance")
+                println("You need to be logged in to get your balance")
                 return
             }
             val money = socket.requestResponse(
@@ -187,19 +197,262 @@ fun runStep(input: String) {
             }
             minerMenu()
         }
+        "data" -> {
+            if(!loggedIn){
+                println("Can't submit data without being logged in")
+                return
+            }
+            submitDataMenu()
+        }
         "help" -> {
             """
-            login   |  log in
-            signup  |  make a new Gumbocoin account
-            money   |  find out how many Gumbocoins you have
-            miner   |  control the miner
-            help    |  print this menu
-            exit    |  exit
+            login           |  log in
+            signup          |  make a new Gumbocoin account
+            money           |  find out how many Gumbocoins you have
+            miner           |  control the miner
+            help            |  print this menu
+            browse          |  browse the actions on the blockchain
+            exit            |  exit
         """.trimIndent()
+                .let { println(it) }
         }
         else -> {
             println("Unknown command \"$input\"")
         }
+    }
+}
+
+
+fun verify(){
+    print("ID of the data you want to sign? ")
+    val id = scan.nextLine()
+    if(id.isBlank()){
+        println("Not a valid ID")
+        return
+    }
+    verify(id)
+}
+fun verify(id :String){
+    val blockchain = socket.requestResponse(RequestDataBlob(Request.Response.BLOCKCHAIN, clientIDNullable ?: "no-one"),
+        meNullable ?: Person.default)
+        .mapFromJson<Blockchain>()
+        .block() ?: error("Didn't get a response from the server")
+    val dataToSign: DataAction? = blockchain
+        .blocks
+        .flatMap { it.actions }
+        .filter { it.type == ActionType.DATA }
+        .map { it as DataAction }
+        .firstOrNull { it.data.uniqueID == id }
+    if(dataToSign == null){
+        println("Can't find data for ID \"$id\"")
+        return
+    }
+    print("Sign ${dataToSign.clientID}'s data: ${dataToSign.data.key} = ${dataToSign.data.value} (y/n/u): ")
+    when(scan.nextLine().trim()){
+        "y" -> { /* continue */ }
+        "n" -> {
+            return
+        }
+        "u" -> {
+            println(dataToSign.data.uniqueID)
+            print("(y/n): ")
+            val input = scan.nextLine().trim()
+            if(input != "y"){
+                return
+            }
+        }
+        else -> {
+            return
+        }
+    }
+    val bytes = dataToSign.toSingableString().toByteArray(Charset.forName("UTF-8"))
+    val signature = me.sign(bytes)
+    val action = VerifyAction(clientID,dataToSign.data.uniqueID,signature.toBase64())
+    //send the action
+    val response = socket.requestResponse(VerifyActionBlob(
+        clientID = clientID,
+        action = action
+    ),me)
+        .mapFromJson<Status>()
+        .block() ?: error("Didn't get a response from the server")
+    if(!response.failed)
+        println("Verification added successfully!")
+    else {
+        println("Verification submission failed")
+        response.errorMessage.takeIf { it.isNotBlank() }
+            ?.let { println("    error message:$it") }
+        response.extraData.takeIf { it.isNotBlank() }
+            ?.let { println("        extraData:$it") }
+    }
+}
+
+
+fun browseActions(){
+    var blockchain :Blockchain = (Blockchain(emptyList()))
+
+    var datas :List<Action> = emptyList()
+
+    fun refresh(){
+        blockchain = socket.requestResponse(RequestDataBlob(Request.Response.BLOCKCHAIN, clientIDNullable ?: "no-one"),
+            meNullable ?: Person.default)
+            .mapFromJson<Blockchain>()
+            .block() ?: error("Didn't get a response from the server")
+        datas = blockchain.blocks.flatMap { it.actions }
+    }
+    refresh()
+
+    var index = 0
+    while(true) {
+        print(">")
+        when(val char = scan.nextLine().toCharArray().firstOrNull() ?: 0.toChar()){
+            'h' -> {
+                println(
+"""a - move one down
+d - move one up
+c - get the current item
+i - get the current index
+e - exit
+t - print all
+v - verify the current item
+r - refresh"""
+                )
+            }
+            'a' -> {
+                index = printAction(index - 1,datas,blockchain)
+            }
+            'd' -> {
+                index = printAction(index + 1,datas,blockchain)
+            }
+            'c' -> {
+                printAction(index,datas,blockchain)
+            }
+            0.toChar() -> {}
+            'e','q' -> return
+            't' -> {
+                datas.forEach { println(stringy(it,blockchain)) }
+            }
+            'v' -> {
+                if(index < 0 || index >= datas.size) {
+                    println("Index out of bounds")
+                } else {
+                    val data = datas[index]
+                    if(data.type != ActionType.DATA){
+                        println("Can't verify non-data actions")
+                    }else{
+                        data as DataAction
+                        verify(data.data.uniqueID)
+                    }
+                }
+            }
+            'i' -> {
+                println(index)
+            }
+            'r' -> {
+                refresh()
+            }
+            else -> {
+                println("Unknown character \"$char\"")
+            }
+        }
+    }
+}
+
+fun printAction(index :Int, datas :List<Action>,blockchain: Blockchain):Int{
+    when {
+        index < 0 -> {
+            println("Below 0 - out of range")
+            return -1
+        }
+        index >= datas.size -> {
+            println("Above ${datas.size} - out of range")
+            return datas.size
+        }
+        else -> println(stringy(datas[index],blockchain))
+    }
+    return index
+}
+fun stringy(a :Action,blockchain: Blockchain):String{
+    return when(a){
+        is SignUpAction -> "${a.clientID} Signed up"
+        is DataAction -> "${a.clientID} published data: ${a.data.key} = ${a.data.value} ".padEnd(64,' ') +
+                " (" + a.data.uniqueID + ")"
+        is VerifyAction -> {
+            val data = blockchain
+                .blocks
+                .flatMap {it.actions }
+                .filter { it.type == ActionType.DATA }
+                .map { it as DataAction }
+                .firstOrNull { it.data.uniqueID == a.dataID }
+            val dataStr = if(data == null) "" else "${data.clientID}: ${data.data.key} = ${data.data.value} "
+            //this should handle null cases and not crash, as crashing is bad
+            "${a.clientID} verified data $dataStr".padEnd(64,' ') + " (" + a.dataID + ")"
+        }
+        else -> "Not done yet:$a"
+    }
+}
+
+fun submitDataMenu() {
+    print("Enter key for data (? for help )")
+    val input = scan.nextLine().trim()
+    if(input.isBlank()){
+        println("Can't accept that as a key")
+        return submitDataMenu()
+    }
+    if(input == "?"){
+        println("Valid keys:")
+        validKeys.forEach { println("   $it") }
+        println("Type \"nevermind\" to exit")
+        return submitDataMenu()
+    }
+    if(input == "nevermind"){
+        return
+    }
+    if(!validKeys.contains(input)){
+        println("\"$input\" is not a valid key")
+        return submitDataMenu()
+    }
+    @Suppress("UNREACHABLE_CODE")
+    val value =  Callable<String> {
+        while (true) {
+            print("Value: ")
+            val inn = scan.nextLine().trim()
+            if (inn.isBlank()) {
+                println("Value can not be blank")
+            } else {
+                return@Callable inn
+            }
+        }
+        error("Exited loop - tf?")
+    }.call()
+
+    //actually make request
+    val pair = DataPair(
+        key = input,
+        value = value,
+        uniqueID = UUID.randomUUID().toString()
+    )
+    val response = socket
+        .requestResponse(
+            data = DataSubmissionDataBlob(
+                clientID = clientID,
+                action = DataAction.sign(
+                    clientID = clientID,
+                    data = pair,
+                    person = me
+                )
+            ),
+            keys = me
+        )
+        .mapFromJson<Status>()
+        .block() ?: error("Didn't get a response from the server")
+    if(!response.failed)
+        println("Data added successfully!")
+    else {
+        println("Data submission failed\n")
+        response.errorMessage.takeIf { it.isNotBlank() }
+            ?.let { println("    error message:$it") }
+        response.extraData.takeIf { it.isNotBlank() }
+            ?.let { println("        extraData:$it") }
     }
 }
 
@@ -291,6 +544,7 @@ fun minerMenu() {
                     element?.let { print("\r$it\n>") }
                 }
             }
+
 
             "back", "exit" -> {
                 return

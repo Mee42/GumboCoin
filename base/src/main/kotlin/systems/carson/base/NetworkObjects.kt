@@ -63,7 +63,8 @@ enum class RequestDataBlobType {
     STRING_DATA,
     INT_DATA,
     TRANSACTION,
-    DATA_SUBMIT
+    DATA_SUBMIT,
+    VERIFY_DATA
 }
 
 fun String.trimAESPadding(): String {
@@ -134,6 +135,17 @@ data class TransactionAction(val clientID: String, val recipientID: String, val 
     }
 }
 
+data class VerifyAction(val clientID :String,
+                        val dataID :String,
+                        val signature :String) :Action(ActionType.VERIFY)
+
+class VerifyActionBlob(clientID :String, val action :VerifyAction) :RequestDataBlob(
+    Request.Response.VERIFY.intent,
+    clientID,
+    type = RequestDataBlobType.VERIFY_DATA
+)
+
+
 data class DataPair(
     val key: String,
     val value: String,
@@ -146,8 +158,8 @@ data class DataAction(
     val signature: String
 ) : Action(ActionType.DATA) {
 
-    private fun toSingableString(): String {
-        return clientID + data.toString()
+    fun toSingableString(): String {
+        return clientID + serialize(data)
     }
 
     fun isSignatureValid(publicKey: PublicKey): Boolean {
@@ -157,7 +169,6 @@ data class DataAction(
             this.toSingableString().toByteArray(Charset.forName("UTF-8"))
         )
     }
-
     companion object {
         fun sign(clientID: String, data: DataPair, person: Person): DataAction {
             return DataAction(
@@ -175,7 +186,7 @@ data class DataAction(
     }
 }
 
-enum class ActionType { SIGN_UP, TRANSACTION, DATA }
+enum class ActionType { SIGN_UP, TRANSACTION, DATA, VERIFY }
 
 
 class Message(

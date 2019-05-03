@@ -3,9 +3,7 @@ package com.gumbocoin.server
 
 import reactor.util.function.Tuples
 import spark.Spark.*
-import systems.carson.base.ActionType
-import systems.carson.base.DataAction
-import systems.carson.base.prettyPrint
+import systems.carson.base.*
 
 interface Killable {
     fun kill()
@@ -88,7 +86,19 @@ fun startHttps(): Killable {
     get("/data") { _, _ ->
         deserializeForHtml(blockchain.blocks
             .flatMap { it.actions }
-            .filter { it.type == ActionType.DATA })
+            .filter { it.type == ActionType.DATA }
+            .map { it as DataAction }
+            .map { dataAction -> SerializedDataAction(
+                clientID = dataAction.clientID,
+                data = dataAction.data,
+                signature = dataAction.signature,
+                signedBy = blockchain.blocks
+                    .flatMap { it.actions }
+                    .filter { it.type == ActionType.VERIFY }
+                    .map { it as VerifyAction }
+                    .filter { it.dataID == dataAction.data.uniqueID }
+                    .map { it.clientID }
+            ) })
     }
 
 
@@ -99,8 +109,13 @@ fun startHttps(): Killable {
     }
 
 }
+private data class SerializedDataAction(
+    val clientID :String,
+    val data : DataPair,
+    val signature: String,
+    val signedBy :List<String>)
 
-private class SerializedUser(
+private data class SerializedUser(
     val clientID: String,
     val publicKey: String,
     val data: List<DataAction>
