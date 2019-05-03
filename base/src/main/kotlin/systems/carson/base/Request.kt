@@ -10,7 +10,8 @@ class Request {
         BLOCKCHAIN("blockchain"),
         TRANSACTION("transaction"),
         MONEY("money"),
-        DATA("data")
+        DATA("data"),
+        VERIFY("verify")
     }
 
     enum class Stream(val intent: String) {

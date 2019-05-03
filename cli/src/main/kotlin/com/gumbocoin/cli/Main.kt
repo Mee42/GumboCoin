@@ -4,14 +4,14 @@ import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.Flux
-import reactor.util.function.Tuple2
+import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.io.File
 import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
+import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
-import javax.naming.TimeLimitExceededException
 
 val scan = Scanner(System.`in`)
 
@@ -163,6 +163,9 @@ fun runStep(input: String) {
             }
 
         }
+        "browse-data" -> {
+            browserData()
+        }
         "money" -> {
             if (!loggedIn) {
                 println("You need to be logged to get your balance")
@@ -187,6 +190,13 @@ fun runStep(input: String) {
             }
             minerMenu()
         }
+        "data" -> {
+            if(!loggedIn){
+                println("Can't submit data without being logged in")
+                return
+            }
+            submitDataMenu()
+        }
         "help" -> {
             """
             login   |  log in
@@ -200,6 +210,143 @@ fun runStep(input: String) {
         else -> {
             println("Unknown command \"$input\"")
         }
+    }
+}
+
+
+fun browserData(){
+    val datas = socket.requestResponse(RequestDataBlob(Request.Response.BLOCKCHAIN, clientIDNullable ?: "no-one"),
+        meNullable ?: Person.default)
+        .mapFromJson<Blockchain>()
+        .map { it.blocks }
+        .flatMapMany { it.toFlux() }
+        .map { it.actions }
+        .flatMap { it.toFlux() }
+        .collectList()
+        .block() ?: error("Didn't get a response from the server")
+    var index = 0
+    while(true) {
+        print(">")
+        when(val char = scan.nextLine().toCharArray().firstOrNull() ?: 0.toChar()){
+            'h' -> {
+                println(
+"""a - move one down
+d - move one up
+c - get the current item
+i - get the current index
+e - exit
+t - print all"""
+                )
+            }
+            'a' -> {
+                index = printAction(index - 1,datas)
+            }
+            'd' -> {
+                index = printAction(index + 1,datas)
+            }
+            'c' -> {
+                printAction(index,datas)
+            }
+            0.toChar() -> {}
+            'e' -> return
+            't' -> {
+                datas.forEach { println(stringy(it)) }
+            }
+            'i' -> {
+                println(index)
+            }
+            else -> {
+                println("Unknown character \"$char\"")
+            }
+        }
+    }
+}
+
+fun printAction(index :Int, datas :List<Action>):Int{
+    when {
+        index < 0 -> {
+            println("Below 0 - out of range")
+            return -1
+        }
+        index >= datas.size -> {
+            println("Above ${datas.size} - out of range")
+            return datas.size
+        }
+        else -> println(stringy(datas[index]))
+    }
+    return index
+}
+fun stringy(a :Action):String{
+    return when(a){
+        is SignUpAction -> "${a.clientID} Signed up"
+        is DataAction -> "${a.clientID} published data: ${a.data.key} = ${a.data.value}     ".padEnd(64,' ') +
+                " (" + a.data.uniqueID + ")"
+        else -> "Not done yet:$a"
+    }
+}
+
+fun submitDataMenu() {
+    print("Enter key for data (? for help )")
+    val input = scan.nextLine().trim()
+    if(input.isBlank()){
+        println("Can't accept that as a key")
+        return submitDataMenu()
+    }
+    if(input == "?"){
+        println("Valid keys:")
+        validKeys.forEach { println("   $it") }
+        println("Type \"nevermind\" to exit")
+        return submitDataMenu()
+    }
+    if(input == "nevermind"){
+        return
+    }
+    if(!validKeys.contains(input)){
+        println("\"$input\" is not a valid key")
+        return submitDataMenu()
+    }
+    @Suppress("UNREACHABLE_CODE")
+    val value =  Callable<String> {
+        while (true) {
+            print("Value: ")
+            val inn = scan.nextLine().trim()
+            if (inn.isBlank()) {
+                println("Value can not be blank")
+            } else {
+                return@Callable inn
+            }
+        }
+        error("Exited loop - tf?")
+    }.call()
+
+    //actually make request
+    val pair = DataPair(
+        key = input,
+        value = value,
+        uniqueID = UUID.randomUUID().toString()
+    )
+    val response = socket
+        .requestResponse(
+            data = DataSubmissionDataBlob(
+                clientID = clientID,
+                action = DataAction.sign(
+                    clientID = clientID,
+                    data = pair,
+                    person = me
+                )
+            ),
+            keys = me
+        )
+        .mapFromJson<Status>()
+        .block() ?: error("Didn't get a response from the server")
+    if(!response.failed)
+        println("Data added successfully!")
+    else {
+        println("Data submission failed\n")
+        response.errorMessage.takeIf { it.isNotBlank() }
+            ?.let { println("    error message:$it") }
+        response.extraData.takeIf { it.isNotBlank() }
+            ?.let { println("        extraData:$it") }
     }
 }
 
@@ -291,6 +438,7 @@ fun minerMenu() {
                     element?.let { print("\r$it\n>") }
                 }
             }
+
 
             "back", "exit" -> {
                 return

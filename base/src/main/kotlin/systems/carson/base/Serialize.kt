@@ -17,6 +17,12 @@ inline fun <reified T> deserialize(string: String): T {
 }
 
 
+private inline fun <reified T> JsonObject.obj(name :String, context :JsonDeserializationContext) :T =
+    context.deserialize(getAsJsonObject(name),T::class.java)
+
+fun JsonObject.str(s: String): String = getAsJsonPrimitive(s).asString
+fun JsonObject.int(s: String): Int = getAsJsonPrimitive(s).asInt
+
 object GsonHolder {
     val serializingGson: Gson by lazy { serializingGsonProducer.invoke().create() }
     val prettySerializingGson: Gson by lazy { serializingGsonProducer.invoke().setPrettyPrinting().create() }
@@ -35,28 +41,32 @@ object GsonHolder {
                 ): Action? {
                     val obj = json.asJsonObject
 
-                    fun str(s: String): String = obj.getAsJsonPrimitive(s).asString
-                    fun int(s: String): Int = obj.getAsJsonPrimitive(s).asInt
 
-                    val clientID: String = obj.getAsJsonPrimitive("clientID").asString
+
+                    val clientID: String = obj.str("clientID")
 
                     return when (ActionType.valueOf((obj.get("type").asString))) {
                         ActionType.SIGN_UP -> {
                             SignUpAction(
                                 clientID = clientID,
-                                publicKey = str("publicKey")
+                                publicKey = obj.str("publicKey")
                             )
                         }
                         ActionType.TRANSACTION -> TransactionAction(
                             clientID = clientID,
-                            recipientID = str("recipientID"),
-                            amount = int("amount"),
-                            signature = str("signature")
+                            recipientID = obj.str("recipientID"),
+                            amount = obj.int("amount"),
+                            signature = obj.str("signature")
                         )
                         ActionType.DATA -> DataAction(
                             clientID = clientID,
-                            data = context.deserialize(obj.getAsJsonObject("data"), DataPair::class.java),
-                            signature = str("signature")
+                            data = obj.obj("data",context),
+                            signature = obj.str("signature")
+                        )
+                        ActionType.VERIFY -> VerifyAction(
+                            clientID = clientID,
+                            dataPair = obj.obj("dataPair",context),
+                            signature = obj.str("signature")
                         )
                     }
                 }
@@ -88,12 +98,12 @@ object GsonHolder {
                         )
                         RequestDataBlobType.ENCRYPTED_DATA -> EncryptedDataBlob(
                             clientID = clientID,
-                            data = context.deserialize(obj.getAsJsonObject("data"), EncryptedString::class.java),
+                            data = obj.obj("data",context),
                             intent = intent
                         )
                         RequestDataBlobType.BLOCK_DATA -> BlockDataBlob(
                             clientID = clientID,
-                            block = context.deserialize(obj.getAsJsonObject("block"), Block::class.java),
+                            block = obj.obj("block",context),
                             intent = intent
                         )
                         RequestDataBlobType.STRING_DATA -> StringDataBlob(
@@ -112,16 +122,16 @@ object GsonHolder {
                         )
                         RequestDataBlobType.TRANSACTION -> TransactionDataBlob(
                             clientID = clientID,
-                            transactionAction = context.deserialize(
-                                obj.getAsJsonObject("transactionAction"),
-                                TransactionAction::class.java
-                            )
+                            transactionAction = obj.obj("transactionAction",context)
                         )
                         RequestDataBlobType.DATA_SUBMIT -> DataSubmissionDataBlob(
                             clientID = clientID,
-                            action = context.deserialize(obj.getAsJsonObject("action"), DataAction::class.java)
+                            action = obj.obj("action",context)
                         )
-
+                        RequestDataBlobType.VERIFY_DATA -> VerifyActionBlob(
+                            clientID = clientID,
+                            action = obj.obj("action",context)
+                        )
                     }
                 }
             })
