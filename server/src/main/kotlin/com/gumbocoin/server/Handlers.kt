@@ -99,7 +99,7 @@ enum class ResponseHandler(
             ).toPayload()
         }
 
-
+        BlockchainManager.
         blockchain = newBlockchain
         clearDataCache()
         DiscordManager.blockchainChannel

@@ -10,7 +10,7 @@ object Mongo {
     private val client by kindaLazy { MongoClients.create("mongodb://192.168.1.203") }
     private val database by kindaLazy { client.getDatabase("gumbo") }
 
-    val users: MongoCollection<Document> by kindaLazy { database.getCollection("users") }
+//    private val users: MongoCollection<Document> by kindaLazy { database.getCollection("users") }
     val blockchain: MongoCollection<Document> by kindaLazy { database.getCollection("users") }
 
 }

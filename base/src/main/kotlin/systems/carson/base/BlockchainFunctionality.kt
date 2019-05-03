@@ -32,6 +32,8 @@ fun Blockchain.isValid(): Optional<String> {
     return Optional.empty()
 }
 
+fun Blockchain.isValidBoolean():Boolean = this.isValid().isPresent.not()
+
 
 fun Blockchain.subBlockchain(endIndex: Int): Blockchain {
     return Blockchain(this.blocks.subList(0, endIndex))

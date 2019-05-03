@@ -5,7 +5,6 @@ import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
-import java.nio.charset.Charset
 import java.time.Duration
 import java.time.Instant
 
@@ -14,14 +13,8 @@ const val defaultDifficulty = 25L
 const val blocksToTake = 5
 
 
-var blockchain: Blockchain =
-    Blockchain(
-        listOf(
-            block(
-                KeyManager.server.sign(block(Signature.VOID.toBase64()).hash.toByteArray(Charset.forName("UTF-8"))).toBase64()
-            )
-        )
-    )
+val blockchain: Blockchain
+    get() = BlockchainManager.blockchain
 
 val diff: Long
     get() {
