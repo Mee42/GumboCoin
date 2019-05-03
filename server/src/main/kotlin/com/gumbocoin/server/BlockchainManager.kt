@@ -4,9 +4,13 @@ import com.gumbocoin.server.BlockchainManager.BlockchainSource.*
 import com.mongodb.client.model.Filters
 import org.bson.Document
 import reactor.core.publisher.toFlux
+import reactor.core.publisher.toMono
 import systems.carson.base.*
 import java.nio.charset.Charset
 import kotlin.concurrent.thread
+import org.bson.json.JsonWriterSettings
+
+
 
 
 object BlockchainManager {
@@ -36,7 +40,10 @@ object BlockchainManager {
             thread(start = true) {
                 when (flag) {
                     DATABASE,RESET_AND_CREATE -> {//write it to the database.
+                        println("Inserting blockchain into database")
                         Mongo.blockchain.insertOne(blockchainToBson(newBlockchain))
+                            .toMono()
+                            .subscribe()
                     }
                     MEMORY -> { /* do nothing */ }
                 }
@@ -56,6 +63,8 @@ object BlockchainManager {
             error("YOU IDIOT!")
         }
         Mongo.blockchain.deleteMany(Filters.exists("_id"))
+            .toMono()
+            .subscribe()
         return generateNewBlockchain()
     }
 
@@ -65,9 +74,9 @@ object BlockchainManager {
         val blockchain = blockchainSource
             .find()
             .toFlux()
-            .map { bsonToBlockchain(it) }
             .collectList()
-            .block()
+            .block()!!
+            .map { bsonToBlockchain(it) }
             .removeNull("Error when finding blockchains")
             .maxBy { it.blocks.size }  //take the one with the most blocks
             ?: error("Couldn't find the largest blockchain")
@@ -83,9 +92,13 @@ object BlockchainManager {
     }
 
     private fun bsonToBlockchain(doc : Document):Blockchain{
-        return deserialize(doc.toJson())
+        val settings = JsonWriterSettings.builder()
+            .int64Converter { value, writer -> writer.writeNumber(value!!.toString()) }
+            .build()
+        return deserialize(doc.toJson(settings))
     }
     private fun blockchainToBson(blockchain :Blockchain):Document{
+
         return Document.parse(serialize(blockchain))
     }
 

@@ -9,7 +9,7 @@ import java.time.Duration
 import java.time.Instant
 
 val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
-const val defaultDifficulty = 25L
+const val defaultDifficulty = 5L
 const val blocksToTake = 5
 
 
