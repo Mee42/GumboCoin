@@ -1,8 +1,5 @@
 package com.gumbocoin.server
 
-import discord4j.common.json.EmojiResponse
-import discord4j.core.DiscordClient
-import discord4j.core.`object`.util.Snowflake
 import io.rsocket.Payload
 import reactor.core.publisher.Flux
 import reactor.core.publisher.toFlux
@@ -193,11 +190,15 @@ enum class ResponseHandler(
                 extraData = pay.clientID + " verses " + pay.action.clientID
             ).toPayload()
 
-        if (pay.action.data.key != "name")
+        if (!validKeys.contains(pay.action.data.key))
             return@req Status(failed = true, errorMessage = "Data without the key `name` is invalid").toPayload()
 //        TODO("Remove, duh")
 
-        val user = blockchain.users.first { it.id == pay.clientID }
+        val user =
+            (blockchain.users + dataCache.filter { it.type == ActionType.SIGN_UP }
+                .map { it as SignUpAction }
+                .map { User(it.clientID,Person.fromPublicKey(it.publicKey)) })
+                .firstOrNull { it.id == pay.clientID } ?: return@req Status(failed = true, errorMessage = "Can't find user").toPayload()
 
         if (!pay.action.isSignatureValid(user.person.publicKey))
             return@req Status(failed = true, errorMessage = "Signature on dataAction is not valid").toPayload()
@@ -212,6 +213,40 @@ enum class ResponseHandler(
             ).toPayload()
 
         addToDataCache(pay.action)
+        Status().toPayload()
+    }),
+    VERIFY_DATA_SUBMISSION(Request.Response.VERIFY, req@{ pay ->
+        if(!pay.isVerified)
+            return@req Status(failed = true, errorMessage = "Unverified RequestDataBlob").toPayload()
+        pay as VerifyActionBlob
+        val action: VerifyAction = pay.action
+        if(action.clientID != action.clientID)
+            return@req Status(failed = true, errorMessage = "Action ID different then the payload's ID",
+                extraData = "action.clientID: ${action.clientID}  action.clientID:${action.clientID}").toPayload()
+        val user = blockchain
+            .users
+            .firstOrNull { it.id == action.clientID } ?: return@req Status(failed = true, errorMessage = "Couldn't find public key").toPayload()
+
+        val dataPair = blockchain
+            .blocks
+            .flatMap { it.actions }
+            .filter { it.type == ActionType.DATA }
+            .map { it as DataAction }
+            .firstOrNull { it.data.uniqueID == pay.action.dataID } ?: return@req Status(failed = true, errorMessage = "Can't find the data for the unique ID",
+            extraData = "Unique ID:${pay.action.dataID}").toPayload()
+
+        val verified = Person.verify(
+            user.person,
+            Signature.fromBase64(pay.action.signature),
+            dataPair.toSingableString().toByteArray(Charset.forName("UTF-8")))
+
+        if(!verified)
+            return@req Status(failed = true,
+                errorMessage = "Action is not properly signed",
+                extraData = "").toPayload()
+
+        //I think it's good....hopefully?
+        addToDataCache(action)
         Status().toPayload()
     })
 }
