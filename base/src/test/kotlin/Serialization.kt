@@ -24,5 +24,4 @@ internal class Serialization {
         val new = Person.fromKeyFile(serialized)
         assertEquals(person, new)
     }
-    //TODO FIGURE OUT HOW TO GET PUBLIC KEY
 }

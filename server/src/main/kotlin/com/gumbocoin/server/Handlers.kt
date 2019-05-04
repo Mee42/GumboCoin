@@ -191,8 +191,7 @@ enum class ResponseHandler(
             ).toPayload()
 
         if (!validKeys.contains(pay.action.data.key))
-            return@req Status(failed = true, errorMessage = "Data without the key `name` is invalid").toPayload()
-//        TODO("Remove, duh")
+            return@req Status(failed = true, errorMessage = "Data with key ${pay.action.data.key} is invalid").toPayload()
 
         val user =
             (blockchain.users + dataCache.filter { it.type == ActionType.SIGN_UP }
