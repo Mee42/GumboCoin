@@ -121,7 +121,6 @@ fun runStep(input: String) {
             } else {
                 println("Couldn't verify account. Login unsuccessful")
             }
-            //TODO test
         }
         "signup" -> {
             val clientID = DigestUtils.sha1Hex(UUID.randomUUID().toString()).substring(0, 10)
