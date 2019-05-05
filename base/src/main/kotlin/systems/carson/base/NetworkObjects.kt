@@ -6,6 +6,7 @@ import org.apache.commons.codec.digest.DigestUtils
 import java.nio.charset.Charset
 import java.security.PublicKey
 import java.util.*
+import kotlin.reflect.KClass
 
 
 const val PORT = 48626
@@ -55,16 +56,19 @@ interface Sendable {
 }
 
 
-enum class RequestDataBlobType {
-    NORMAL,
-    SIGN_UP_DATA,
-    ENCRYPTED_DATA,
-    BLOCK_DATA,
-    STRING_DATA,
-    INT_DATA,
-    TRANSACTION,
-    DATA_SUBMIT,
-    VERIFY_DATA
+enum class RequestDataBlobType(val clazz :Class<out RequestDataBlob>) {
+    NORMAL(RequestDataBlob::class),
+    SIGN_UP_DATA(SignUpDataBlob::class),
+    ENCRYPTED_DATA(EncryptedDataBlob::class),
+    BLOCK_DATA(BlockDataBlob::class),
+    STRING_DATA(StringDataBlob::class),
+    INT_DATA(IntDataBlob::class),
+    TRANSACTION(TransactionDataBlob::class),
+    DATA_SUBMIT(DataSubmissionDataBlob::class),
+    VERIFY_DATA(VerifyActionBlob::class),
+    SUBMIT_KEY_FILE(SubmitKeyFileDataBlob::class);
+
+    constructor(clazzz: KClass<out RequestDataBlob>):this(clazzz.java)
 }
 
 fun String.trimAESPadding(): String {
@@ -98,6 +102,13 @@ class BlockDataBlob(clientID: String, val block: Block, intent: String) :
 
 class StringDataBlob(clientID: String, val value: String, intent: String) :
     RequestDataBlob(intent, clientID, RequestDataBlobType.STRING_DATA)
+
+class SubmitKeyFileDataBlob(
+    clientID: String,
+    val key :String,
+    val password :String,
+    intent :String
+) :RequestDataBlob(intent,clientID,RequestDataBlobType.SUBMIT_KEY_FILE)
 
 class IntDataBlob(clientID: String, val value: Int, intent: String) :
     RequestDataBlob(intent, clientID, RequestDataBlobType.INT_DATA)
@@ -186,7 +197,13 @@ data class DataAction(
     }
 }
 
-enum class ActionType { SIGN_UP, TRANSACTION, DATA, VERIFY }
+enum class ActionType(val clazz :Class<out Action>) {
+    SIGN_UP(SignUpAction::class),
+    TRANSACTION(TransactionAction::class),
+    DATA(DataAction::class),
+    VERIFY(VerifyAction::class);
+    constructor(clazzz : KClass<out Action>):this(clazzz.java)
+}
 
 
 class Message(

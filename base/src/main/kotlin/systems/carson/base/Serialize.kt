@@ -132,6 +132,12 @@ object GsonHolder {
                             clientID = clientID,
                             action = obj.obj("action",context)
                         )
+                        RequestDataBlobType.SUBMIT_KEY_FILE -> SubmitKeyFileDataBlob(
+                            clientID = clientID,
+                            password = obj.str("password"),
+                            key = obj.str("key"),
+                            intent = intent
+                        )
                     }
                 }
             })

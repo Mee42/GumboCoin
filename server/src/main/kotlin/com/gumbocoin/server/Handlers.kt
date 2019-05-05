@@ -1,11 +1,19 @@
 package com.gumbocoin.server
 
+import com.mongodb.client.model.Filters
+import com.mongodb.reactivestreams.client.Success
 import io.rsocket.Payload
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
+import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
+import reactor.core.publisher.toMono
 import systems.carson.base.*
 import java.nio.charset.Charset
+import java.time.Duration
 import java.time.Instant
+import java.util.*
 
 
 val handlerLogger = GLogger.logger("Handler")
@@ -247,7 +255,53 @@ enum class ResponseHandler(
         //I think it's good....hopefully?
         addToDataCache(action)
         Status().toPayload()
+    }),
+    SUBMIT_KEY_FILE(Request.Response.SUBMIT_KEY_FILE, req@{ pay: RequestDataBlob ->
+        if(!pay.isVerified)
+            return@req Status(failed = true, errorMessage = "Unverified RequestDataBlob").toPayload()
+        pay as SubmitKeyFileDataBlob
+        val password = pay.password
+        val (hash, salt) = passwordHash(password)
+        val user = ServerUser(
+            clientID = pay.clientID,
+            keyfile = pay.key,
+            salt = salt,
+            hash = hash)
+        println("password:$password")
+        println("salt:$salt")
+        println("hash:$hash")
+        println("passwordHash(password,salt):${passwordHash(password,salt)}")
+        Mongo
+            .users
+            .deleteOne(Filters.all("clientID",user.clientID))
+            .toMono()
+            .then(Mongo.users
+                .insertOne(serializeToDocument(user))
+                .toMono()
+            ).subscribe()
+        return@req Status().toPayload()
+    }),
+    GET_KEY_FILE(Request.Response.GET_KEY_FILE, req@{pay ->
+        pay as StringDataBlob
+        //the value is the password
+        var user: ServerUser? = null
+        Mongo.users
+            .find(Filters.all("clientID",pay.clientID))
+            .first()
+            .toMono()
+            .map { user = deserialize<ServerUser>(it) }
+            .subscribe()
+        val start = Instant.now()
+        while(user == null && Duration.between(Instant.now(),start).abs().abs().minus(Duration.ofSeconds(10)).isNegative){ }
+        val u = user ?: return@req Status(failed = true, errorMessage = "No ServerUser entry for you").toPayload()
+
+        val newHash = passwordHash(pay.value,u.salt)
+        if(newHash == u.hash)
+            return@req SendableString(u.keyfile).toPayload()
+        else
+            return@req Status(failed = true,
+                errorMessage = "Hash is invalid",
+                extraData = "Got $newHash but needed ${u.hash}")//TODO remove
+                .toPayload()
     })
 }
-
-

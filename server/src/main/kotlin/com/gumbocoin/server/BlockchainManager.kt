@@ -2,6 +2,7 @@ package com.gumbocoin.server
 
 import com.gumbocoin.server.BlockchainManager.BlockchainSource.*
 import com.mongodb.client.model.Filters
+import com.mongodb.reactivestreams.client.Success
 import org.bson.Document
 import reactor.core.publisher.toFlux
 import reactor.core.publisher.toMono
@@ -9,8 +10,8 @@ import systems.carson.base.*
 import java.nio.charset.Charset
 import kotlin.concurrent.thread
 import org.bson.json.JsonWriterSettings
-
-
+import org.reactivestreams.Subscriber
+import org.reactivestreams.Subscription
 
 
 object BlockchainManager {
@@ -43,7 +44,7 @@ object BlockchainManager {
                         println("Inserting blockchain into database")
                         Mongo.blockchain.insertOne(blockchainToBson(newBlockchain))
                             .toMono()
-                            .subscribe()
+                            .block()
                     }
                     MEMORY -> { /* do nothing */ }
                 }
