@@ -14,9 +14,9 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 
-val scan = Scanner(System.`in`)
+private val scan = Scanner(System.`in`)
 
-val socket = RSocketFactory.connect()
+private val socket = RSocketFactory.connect()
     .transport(TcpClientTransport.create("localhost", PORT))
     .start()
     .block()!!
