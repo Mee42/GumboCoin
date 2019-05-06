@@ -18,7 +18,9 @@ val blockchain: Blockchain
 
 val diff: Long
     get() {
-
+        if(FlagManager.debugFlags.contains(DebugFlags.LOW_DIFF)){
+            return defaultDifficulty
+        }
         if (blockchain.blocks.size < blocksToTake)//start out like this and get a feel for the power
             return defaultDifficulty
         val lastFiveBLocks = blockchain.blocks.subList(blockchain.blocks.size - blocksToTake,blockchain.blocks.size)

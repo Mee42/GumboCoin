@@ -1,15 +1,14 @@
 package com.gumbocoin.cli.new
 
+import com.gumbocoin.cli.ThreadedMiner
+import com.gumbocoin.cli.new.dsl.mainConsole
 import com.gumbocoin.cli.requestResponse
+import com.gumbocoin.cli.requestStream
 import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
-import systems.carson.base.PORT
-import systems.carson.base.Person
-import systems.carson.base.Request
-import systems.carson.base.RequestDataBlob
+import systems.carson.base.*
 import java.time.Duration
 import java.util.*
 
@@ -24,7 +23,6 @@ fun main() {
     Flux.interval(Duration.ofMinutes(1))
         .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "default")) }
         .subscribe()
-
     mainConsole.run(context)
 }
 
@@ -36,8 +34,11 @@ class GSocket{
         .start()
         .block()!!
 
-    private fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
-    fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials!!.keys else Person.default )
+    fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
+    fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )
+    fun requestStream(blob :RequestDataBlob, keys :Person) = socket.requestStream(blob,keys)
+    fun requestStream(blob :RequestDataBlob) = requestStream(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )
+
 }
 
 class ConsoleAction(
@@ -48,10 +49,17 @@ class ConsoleAction(
 
 
 class Context private constructor(var socket: GSocket,
-              var scan: Scanner,
-              var credentials :Credentials? = null){
+                                  var scan: Scanner,
+                                  private var credentialsNullable :Credentials? = null,
+                                  var threadedMiner :ThreadedMiner? = null){
     val isLoggedIn
-        get() = credentials != null
+        get() = credentialsNullable != null
+    val credentials
+        get() = credentialsNullable!!
+
+    fun setDaCredentials(credentials: Credentials){
+        credentialsNullable = credentials
+    }
 
     //make sure there's only ever one instant - maybe later, we might need more?
     // we should stay away from global states, right
@@ -64,24 +72,28 @@ class Context private constructor(var socket: GSocket,
             return Context(
                 socket = socket,
                 scan = Scanner(System.`in`),
-                credentials = null)
+                credentialsNullable = null)
         }
     }
 
+    operator fun component1() = socket
+    operator fun component2() = scan
+    operator fun component3() = isLoggedIn
+    operator fun component4() = credentials
 }
 
 interface Runner{ fun run(context: Context) }
 
-class TODORunner :Runner{
+object TODORunner :Runner{
     override fun run(context: Context) {
         TODO("not implemented")
     }
 }
 
 
-class Credentials(
+data class Credentials(
     val clientID: String,
-    val keys :Person)
+    val keys: Person)
 
 class InteractiveConsole(private val actions :List<ConsoleAction>,
                          private val prompt :String){
@@ -104,8 +116,7 @@ class InteractiveConsole(private val actions :List<ConsoleAction>,
                 println("Can't find action \"$input\"")
                 continue
             }
-            val result = action.runner.run(context)
-
+            action.runner.run(context)
         }
     }
 }

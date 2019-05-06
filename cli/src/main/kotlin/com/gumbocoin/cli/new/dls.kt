@@ -4,7 +4,7 @@ class ConsoleActionBuilder{
     var name :String = ""
     var desc :String = ""
     var aliases :List<String> = emptyList()
-    var runner :Runner = TODORunner()
+    var runner :Runner = TODORunner
     fun build():ConsoleAction = ConsoleAction(
         name = name,
         desc = desc,
@@ -16,7 +16,10 @@ class ConsoleActionBuilder{
 }
 
 
-interface Filter{ fun allow(context :Context):Boolean }
+interface Filter{
+    fun allow(context :Context):Boolean
+    fun errorMessage():String? = null//Note: make into a builder and dynamically generate errors?
+}
 
 class FilteredRunnerBuilder{
     fun yes(message :String){
@@ -28,31 +31,53 @@ class FilteredRunnerBuilder{
             }
         })
     }
-    fun conditional(check :() -> Boolean){
+    fun conditional(check :(Context) -> Boolean){
         filters.add(object :Filter {
             override fun allow(context: Context): Boolean {
-                return check.invoke()
+                return check.invoke(context)
             }
         })
-
+    }
+    fun conditional(errorMessage :String, check: (Context) -> Boolean){
+        filters.add(object :Filter {
+            override fun allow(context: Context): Boolean {
+                return check(context)
+            }
+            override fun errorMessage(): String? {
+                return errorMessage
+            }
+        })
     }
 
-    var final :Runner = TODORunner()
+    var final :Runner = TODORunner
+    fun runnerr(run :(Context) -> Unit) {
+        final = object :Runner {
+            override fun run(context: Context) {
+                run.invoke(context)
+            }
+        }
+    }
+
 
     private val filters = mutableListOf<Filter>()
-    fun build() = FilteredRunner(filters,final)
+    fun build(): FilteredRunner {
+        if(final == TODORunner)
+            error("OOF")
+        return FilteredRunner(filters,final)
+    }
 }
 
 class FilteredRunner(private val filters :List<Filter>, private val final :Runner) :Runner{
     override fun run(context: Context) {
         for(filter in filters){
-            if(!filter.allow(context))
+            if(!filter.allow(context)) {
+                filter.errorMessage()?.let { println(it) }
                 return
+            }
         }
         final.run(context)
     }
 }
-
 
 class InteractiveConsoleBuilder{
     private val actions = mutableListOf<ConsoleAction>()
@@ -77,4 +102,81 @@ fun runner(run :(Context) -> Unit): Runner {
         }
     }
 }
+
+class SplitBuilder{
+    var one :Runner = TODORunner
+    var two :Runner = TODORunner
+    fun build():SplitRunner{
+
+        if(one == TODORunner || two == TODORunner)
+            error("OOF")
+
+        return SplitRunner(one,two)
+    }
+}
+class SplitRunner(private val one :Runner, private val two :Runner):Runner{
+    override fun run(context: Context) {
+        one.run(context)
+        two.run(context)
+    }
+}
+
+fun split(block :SplitBuilder.() -> Unit):Runner = SplitBuilder().apply(block).build()
+
 fun filteredRunner(block :FilteredRunnerBuilder.() -> Unit) :Runner = FilteredRunnerBuilder().apply(block).build()
+
+class SwitchBuilder{
+    var conditional: ((Context) -> Boolean)? = null
+    var truthy :Runner = TODORunner
+    var falsy :Runner = TODORunner
+    fun build():Switch{
+        if(truthy == TODORunner || falsy == TODORunner)
+            error("OOF")
+        return Switch(conditional!!, truthy,falsy)
+    }
+}
+
+fun switchy(block :SwitchBuilder.() -> Unit):Runner = SwitchBuilder().apply(block).build()
+
+class Switch(
+    val conditional :(Context) -> Boolean,
+    private val truthy :Runner,
+    private val falsy :Runner
+):Runner{
+    override fun run(context: Context) {
+        if(conditional(context)){
+            truthy.run(context)
+        }else{
+            falsy.run(context)
+        }
+    }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

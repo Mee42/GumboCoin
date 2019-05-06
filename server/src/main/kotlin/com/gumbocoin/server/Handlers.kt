@@ -285,8 +285,11 @@ enum class ResponseHandler(
         pay as StringDataBlob
         //the value is the password
         var user: ServerUser? = null
+        val password = pay.value.split(":")[0]
+        val clientID = pay.value.split(":")[1]
+
         Mongo.users
-            .find(Filters.all("clientID",pay.clientID))
+            .find(Filters.all("clientID",clientID))
             .first()
             .toMono()
             .map { user = deserialize<ServerUser>(it) }
@@ -295,13 +298,17 @@ enum class ResponseHandler(
         while(user == null && Duration.between(Instant.now(),start).abs().abs().minus(Duration.ofSeconds(10)).isNegative){ }
         val u = user ?: return@req Status(failed = true, errorMessage = "No ServerUser entry for you").toPayload()
 
-        val newHash = passwordHash(pay.value,u.salt)
+        val newHash = passwordHash(password,u.salt)
         if(newHash == u.hash)
             return@req SendableString(u.keyfile).toPayload()
         else
             return@req Status(failed = true,
-                errorMessage = "Hash is invalid",
-                extraData = "Got $newHash but needed ${u.hash}")//TODO remove
+                errorMessage = "Hash is invalid"
+//                extraData = "Got $newHash but needed ${u.hash}"
+            )
                 .toPayload()
+    }),
+    DIFF(Request.Response.DIFF, req@ {
+        return@req SendableInt(diff.toString().toIntOrNull() ?: -1).toPayload()
     })
 }

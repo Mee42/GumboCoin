@@ -14,7 +14,8 @@ class Request {
         VERIFY("verify"),
 
         SUBMIT_KEY_FILE("submit_key_file"),
-        GET_KEY_FILE("get_key_file")
+        GET_KEY_FILE("get_key_file"),
+        DIFF("diff")
     }
 
     enum class Stream(val intent: String) {

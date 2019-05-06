@@ -1,5 +1,6 @@
 package com.gumbocoin.cli
 
+import com.gumbocoin.cli.new.Context
 import io.rsocket.RSocket
 import reactor.core.publisher.DirectProcessor
 import reactor.core.publisher.Flux
@@ -15,13 +16,7 @@ import kotlin.concurrent.thread
 class Update(val newBlock: Block)
 
 
-class ThreadedMiner(
-    private val socket: RSocket,
-    private val loggger: GLogger = GLogger.logger("Miner"),
-    private val person: Person,
-    private val clientID: String,
-    sleep: Long = 100
-) {
+class ThreadedMiner(context : Context, sleep: Long = 100) {
 
 
     private var running = false
@@ -59,13 +54,13 @@ class ThreadedMiner(
     }
 
     init {
-        socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, clientID), me)
+        context.socket.requestStream(RequestDataBlob(Request.Stream.BLOCKCHAIN_UPDATES, context.credentials.clientID), context.credentials.keys)
             .map { Sendable.fromJson<ActionUpdate>(it) }
             .map {
                 update(
                     Update(
                         Block(
-                            author = clientID,
+                            author = context.credentials.clientID,
                             actions = it.actions,
                             timestamp = System.currentTimeMillis(),
                             nonce = Random().nextLong(),
@@ -109,7 +104,7 @@ class ThreadedMiner(
                 if (hash.isValid()) {
 //                    println("Found valid hash: $hash")
                     bblock.signature =
-                        person.sign(
+                        context.credentials.keys.sign(
                             bblock.toBlock().excludeSignature().toByteArray(
                                 Charset.forName(
                                     "UTF-8"
@@ -117,13 +112,12 @@ class ThreadedMiner(
                             )
                         ).toBase64()
                     val realBlock = bblock.toBlock()
-                    val result = socket.requestResponse(
+                    val result = context.socket.requestResponse(
                         BlockDataBlob(
                             block = realBlock,
-                            clientID = clientID,
+                            clientID = context.credentials.clientID,
                             intent = Request.Response.BLOCK.intent
-                        ), person
-                    )
+                        ))
                         .map { Sendable.fromJson<Status>(it) }
 //                        .printStatus(
 //                            "Block accepted successfully!   hash:${bblock.hash()}",

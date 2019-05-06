@@ -65,14 +65,14 @@ fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.suc
 }
 
 var clientIDNullable: String? = null
-val clientID: String
+private val clientID: String
     get() {
         if (loggedIn)
             return clientIDNullable!!
         error("Can't access clientID if not logged in")
     }
 var meNullable: Person? = null
-val me: Person
+private val me: Person
     get() {
         if (loggedIn)
             return meNullable!!
@@ -92,7 +92,7 @@ fun runStep(input: String) {
         "server-login" -> {
             val clientID = prompt("ClientID")
             val password = prompt("Password")
-            val got = socket.requestResponse(StringDataBlob(clientID,password,Request.Response.GET_KEY_FILE.intent),Person.default)
+            val got = socket.requestResponse(StringDataBlob("defaultID",DigestUtils.sha256Hex(password) + ":" + clientID,Request.Response.GET_KEY_FILE.intent),Person.default)
                 .block()
             if(got == null){
                 println("Didn't get a response from the server")
@@ -268,7 +268,7 @@ fun signup(){
         val result = socket.requestResponse(SubmitKeyFileDataBlob(
             clientID,
             me.serialize(),
-            password,
+            DigestUtils.sha256Hex(password),
             Request.Response.SUBMIT_KEY_FILE.intent
         ),me)
             .mapFromJson<Status>()
@@ -537,11 +537,7 @@ fun minerMenu() {
         when (val inn = scan.nextLine()) {
             "start" -> {
                 if (miner == null) {
-                    miner = ThreadedMiner(
-                        socket = socket,
-                        person = me,
-                        clientID = clientID
-                    )
+                    miner = null as ThreadedMiner//TODO
                 }
                 println("Starting miner")
                 miner?.start() ?: println("Error starting miner")
