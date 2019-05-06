@@ -281,6 +281,4 @@ class Person private constructor(
     fun publicKeyBase64(): String {
         return Base64.encodeBase64String(publicKey.encoded)
     }
-
-
 }

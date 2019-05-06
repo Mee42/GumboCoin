@@ -69,10 +69,13 @@ fun saveKeys(context :Context):Boolean{
                     "Only people with the password will have access to it")
             runnerr {
                 val password = passwordFunction(context)
+                val serializedKeys = context.credentials.keys.serialize().toByteArray(Charset.forName("UTF-8"))
+                val encryptedKeyFile = AESEncryption.encryptAES(serializedKeys,password.toByteArray(Charset.forName("UTF-8")))
+
                 val result = it.socket.requestResponse(
                     SubmitKeyFileDataBlob(
                         context.credentials.clientID,
-                        context.credentials.keys.serialize(),
+                        serialize(encryptedKeyFile.toStrings()),
                         DigestUtils.sha256Hex(password),
                         Request.Response.SUBMIT_KEY_FILE.intent
                     ), context.credentials.keys)

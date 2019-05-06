@@ -35,7 +35,9 @@ val login = filteredRunner {
                     val str = Gson().fromJson(got.trimAESPadding(), SendableString::class.java)
                     if(str?.value == null)
                         throw JsonSyntaxException("Fuck, why wasn't this caught?")
-                    val person = Person.fromKeyFile(str.value)
+                    val decrypted = deserialize<EncryptedAESStrings>(str.value).toBytes()
+                    val plaintext = AESEncryption.decryptAES(decrypted,password.toByteArray(Charset.forName("UTF-8")))//TODO make password byte[] or char[]
+                    val person = Person.fromKeyFile(plaintext.toString(Charset.forName("UTF-8")))
                     context.setDaCredentials(Credentials(clientID,person))
                     println("Logged in successfully!")
                 } catch (e: JsonSyntaxException) {
