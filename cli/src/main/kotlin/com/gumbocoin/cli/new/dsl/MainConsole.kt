@@ -1,7 +1,6 @@
 package com.gumbocoin.cli.new.dsl
 
-import com.gumbocoin.cli.ThreadedMiner
-import com.gumbocoin.cli.mapFromJson
+import com.gumbocoin.cli.*
 import com.gumbocoin.cli.new.console
 import com.gumbocoin.cli.new.filteredRunner
 import com.gumbocoin.cli.new.runner
@@ -9,6 +8,8 @@ import com.gumbocoin.cli.new.switchy
 import systems.carson.base.*
 import java.time.Duration
 import java.time.Instant
+import java.util.*
+import java.util.concurrent.Callable
 
 /**
  * This is stuff that has to deal with logging in, logging out, an
@@ -113,6 +114,18 @@ val mainConsole = console {
             }
         }
     }
+    action {
+        name = "data"
+        desc = "submit some data to the blockchain"
+        runner = data
+    }
+    action {
+        name = "verify"
+        desc = "verify someone else's data"
+        runner = verify
+    }
 }
+
+
 
 

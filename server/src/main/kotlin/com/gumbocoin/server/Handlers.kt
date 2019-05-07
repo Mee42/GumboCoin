@@ -1,19 +1,14 @@
 package com.gumbocoin.server
 
 import com.mongodb.client.model.Filters
-import com.mongodb.reactivestreams.client.Success
 import io.rsocket.Payload
-import org.reactivestreams.Subscriber
-import org.reactivestreams.Subscription
 import reactor.core.publisher.Flux
-import reactor.core.publisher.Mono
 import reactor.core.publisher.toFlux
 import reactor.core.publisher.toMono
 import systems.carson.base.*
 import java.nio.charset.Charset
 import java.time.Duration
 import java.time.Instant
-import java.util.*
 
 
 val handlerLogger = GLogger.logger("Handler")
@@ -198,7 +193,7 @@ enum class ResponseHandler(
                 extraData = pay.clientID + " verses " + pay.action.clientID
             ).toPayload()
 
-        if (!validKeys.contains(pay.action.data.key))
+        if (!validDataKeys.contains(pay.action.data.key))
             return@req Status(failed = true, errorMessage = "Data with key ${pay.action.data.key} is invalid").toPayload()
 
         val user =

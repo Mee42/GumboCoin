@@ -51,6 +51,10 @@ fun Boolean.toError(message: String) = if (this) ErrorStatus.success() else Erro
 
 fun promptNotBlank(message :String) = prompt(message) { it.isNotBlank().toError("Input can not be blank") }
 
+
+fun promptForString(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.success() }) =
+        prompt(message,isValid)
+
 fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.success() }): String {
     print("$message:")
     val input = scan.nextLine()
@@ -64,14 +68,14 @@ fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.suc
     return prompt(message, isValid)
 }
 
-var clientIDNullable: String? = null
+private var clientIDNullable: String? = null
 private val clientID: String
     get() {
         if (loggedIn)
             return clientIDNullable!!
         error("Can't access clientID if not logged in")
     }
-var meNullable: Person? = null
+private var meNullable: Person? = null
 private val me: Person
     get() {
         if (loggedIn)
@@ -461,7 +465,7 @@ fun stringy(a :Action,blockchain: Blockchain):String{
     }
 }
 
-fun submitDataMenu() {
+private fun submitDataMenu() {
     print("Enter key for data (? for help )")
     val input = scan.nextLine().trim()
     if(input.isBlank()){
@@ -470,14 +474,14 @@ fun submitDataMenu() {
     }
     if(input == "?"){
         println("Valid keys:")
-        validKeys.forEach { println("   $it") }
+        validDataKeys.forEach { println("   $it") }
         println("Type \"nevermind\" to exit")
         return submitDataMenu()
     }
     if(input == "nevermind"){
         return
     }
-    if(!validKeys.contains(input)){
+    if(!validDataKeys.contains(input)){
         println("\"$input\" is not a valid key")
         return submitDataMenu()
     }
