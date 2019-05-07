@@ -11,15 +11,13 @@ import kotlin.concurrent.thread
 import org.bson.json.JsonWriterSettings
 
 
-
-
 object BlockchainManager {
     private const val USE_DATABASE_FLAG = "USE_DATABASE"
 
     private enum class BlockchainSource{
         DATABASE,
         MEMORY,
-        RESET_AND_CREATE;//like DATABASE but it wipes the database on startup
+        WIPE;//like DATABASE but it wipes the database on startup
         companion object{
             val default = MEMORY
         }
@@ -39,13 +37,14 @@ object BlockchainManager {
             field = newBlockchain
             thread(start = true) {
                 when (flag) {
-                    DATABASE,RESET_AND_CREATE -> {//write it to the database.
+                    DATABASE -> {//write it to the database.
                         println("Inserting blockchain into database")
                         Mongo.blockchain.insertOne(blockchainToBson(newBlockchain))
                             .toMono()
-                            .subscribe()
+                            .block()
                     }
                     MEMORY -> { /* do nothing */ }
+                    WIPE -> { error("Can't write when blockchain source is WIPE")}
                 }
             }
         }
@@ -54,18 +53,20 @@ object BlockchainManager {
         return when(flag){
             DATABASE -> generateFromDatabase()
             MEMORY -> generateNewBlockchain()
-            RESET_AND_CREATE -> resetAndCreate()
+            WIPE -> resetAndCrash()
         }
     }
 
-    private fun resetAndCreate():Blockchain {
+    private fun resetAndCrash():Blockchain {
         if(ReleaseManager.release == Release.MASTER){
-            error("YOU IDIOT!")
+            error("YOU IDIOT!\n" +
+                    "Think about this for a solid ")
         }
-        Mongo.blockchain.deleteMany(Filters.exists("_id"))
+        Mongo.blockchain.drop()
             .toMono()
-            .subscribe()
-        return generateNewBlockchain()
+            .block()
+        Thread.sleep(1000)
+        throw RuntimeException("Wiped")
     }
 
 
@@ -79,7 +80,7 @@ object BlockchainManager {
             .map { bsonToBlockchain(it) }
             .removeNull("Error when finding blockchains")
             .maxBy { it.blocks.size }  //take the one with the most blocks
-            ?: error("Couldn't find the largest blockchain")
+            ?: generateNewBlockchain()
         if(!blockchain.isValidBoolean())
             error("blockchain loaded from database is invalid")
         return blockchain

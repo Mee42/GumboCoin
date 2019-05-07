@@ -74,8 +74,13 @@ private fun Flux<Tuple2<String, Payload>>.encryptBackToPerson(): Flux<Payload> =
 
 fun getResponseHandler(requestDataBlob: RequestDataBlob): (RequestDataBlob) -> Payload {
     return ResponseHandler.values()
-        .firstOrNull { it.request == Request.Response.values().first { w -> w.intent == requestDataBlob.intent } }
-        ?.handler ?: error("Can't handle $requestDataBlob")
+        .firstOrNull {
+//            println("it.request.intent == requestDataBlob.intent | " +
+//                    "${it.request.intent} == ${requestDataBlob.intent} | " +
+//                    (it.request.intent == requestDataBlob.intent) )
+            it.request.intent == requestDataBlob.intent
+        }
+        ?.handler ?: error("Can't handle ${requestDataBlob.intent}")
 }
 
 fun getStreamHandler(requestDataBlob: RequestDataBlob): (RequestDataBlob) -> Flux<Payload> {

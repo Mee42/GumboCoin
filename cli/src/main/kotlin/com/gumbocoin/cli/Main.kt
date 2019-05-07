@@ -1,10 +1,11 @@
 package com.gumbocoin.cli
 
+import com.google.gson.Gson
+import com.google.gson.JsonSyntaxException
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import org.apache.commons.codec.digest.DigestUtils
 import reactor.core.publisher.Flux
-import reactor.core.publisher.toFlux
 import systems.carson.base.*
 import java.io.File
 import java.nio.charset.Charset
@@ -13,9 +14,9 @@ import java.util.*
 import java.util.concurrent.Callable
 import java.util.concurrent.TimeUnit
 
-val scan = Scanner(System.`in`)
+private val scan = Scanner(System.`in`)
 
-val socket = RSocketFactory.connect()
+private val socket = RSocketFactory.connect()
     .transport(TcpClientTransport.create("localhost", PORT))
     .start()
     .block()!!
@@ -48,6 +49,12 @@ class ErrorStatus private constructor(val failed: Boolean, val message: String? 
 
 fun Boolean.toError(message: String) = if (this) ErrorStatus.success() else ErrorStatus.error(message)
 
+fun promptNotBlank(message :String) = prompt(message) { it.isNotBlank().toError("Input can not be blank") }
+
+
+fun promptForString(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.success() }) =
+        prompt(message,isValid)
+
 fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.success() }): String {
     print("$message:")
     val input = scan.nextLine()
@@ -61,15 +68,15 @@ fun prompt(message: String, isValid: (String) -> ErrorStatus = { ErrorStatus.suc
     return prompt(message, isValid)
 }
 
-var clientIDNullable: String? = null
-val clientID: String
+private var clientIDNullable: String? = null
+private val clientID: String
     get() {
         if (loggedIn)
             return clientIDNullable!!
         error("Can't access clientID if not logged in")
     }
-var meNullable: Person? = null
-val me: Person
+private var meNullable: Person? = null
+private val me: Person
     get() {
         if (loggedIn)
             return meNullable!!
@@ -85,6 +92,31 @@ var miner: ThreadedMiner? = null
 fun runStep(input: String) {
     when (input) {
         "" -> {
+        }
+        "server-login" -> {
+            val clientID = prompt("ClientID")
+            val password = prompt("Password")
+            val got = socket.requestResponse(StringDataBlob("defaultID",DigestUtils.sha256Hex(password) + ":" + clientID,Request.Response.GET_KEY_FILE.intent),Person.default)
+                .block()
+            if(got == null){
+                println("Didn't get a response from the server")
+                return
+            }
+            val str = try{
+                Gson().fromJson(got.trimAESPadding(),SendableString::class.java)
+//                Sendable.fromJson<SendableString>(got)
+            }catch(e :JsonSyntaxException){
+                val status = Sendable.fromJson<Status>(got)
+                println("Error getting key:${status.errorMessage}")
+                status.extraData.takeIf { it.isNotBlank() }
+                    ?.let { println("Extra data:$it") }
+                return
+            }
+            val person = Person.fromKeyFile(str.value)
+            clientIDNullable = clientID
+            meNullable = person
+            loggedIn = true
+            println("Signed in successfully!")
         }
         "login" -> {
             //attempt to test the clientID
@@ -121,47 +153,9 @@ fun runStep(input: String) {
             } else {
                 println("Couldn't verify account. Login unsuccessful")
             }
-            //TODO test
         }
         "signup" -> {
-            val clientID = DigestUtils.sha1Hex(UUID.randomUUID().toString()).substring(0, 10)
-            val keys = Person.generateNew()
-            println("Registering with the server... ClientID: $clientID")
-            val status = socket.requestResponse(
-                SignUpDataBlob(
-                    clientID = clientID,
-                    signUpAction = SignUpAction(
-                        clientID = clientID,
-                        publicKey = keys.publicKeyBase64()
-                    )
-                ), keys
-            )
-                .mapFromJson<Status>()
-                .block()
-            if (status == null) {
-                println("Didn't get a response from the server")
-            } else {
-                if (status.failed) {
-                    println("Error:" + status.errorMessage)
-                    status.extraData.let { if (it.isBlank()) null else it }
-                        ?.let { println("Extra Data:$it") }
-                } else {
-                    println("Success")
-                    clientIDNullable = clientID
-                    meNullable = keys
-                    loggedIn = true
-                    var keyFile = prompt("Directory to store keys in (.)")
-                    if (keyFile.isBlank())
-                        keyFile = "./"
-                    if (!keyFile.endsWith("/"))
-                        keyFile = "$keyFile/"
-
-                    val file = File("$keyFile$clientID.gc.key")
-                    file.writeText(me.serialize(), Charset.forName("UTF-8"))
-                    println("Created file $keyFile$clientID.gs.key")
-                }
-            }
-
+            signup()
         }
         "browse" -> {
             browseActions()
@@ -222,6 +216,86 @@ fun runStep(input: String) {
     }
 }
 
+
+fun signup(){
+
+    val clientID = DigestUtils.sha1Hex(UUID.randomUUID().toString()).substring(0, 10)
+    val keys = Person.generateNew()
+    println("Registering with the server... ClientID: $clientID")
+    val status = socket.requestResponse(
+        SignUpDataBlob(
+            clientID = clientID,
+            signUpAction = SignUpAction(
+                clientID = clientID,
+                publicKey = keys.publicKeyBase64()
+            )
+        ), keys
+    )
+        .mapFromJson<Status>()
+        .block()
+    if (status == null) {
+        println("Didn't get a response from the server")
+        return
+    }
+    if (status.failed) {
+        println("Error:" + status.errorMessage)
+        status.extraData.let { if (it.isBlank()) null else it }
+            ?.let { println("Extra Data:$it") }
+        return
+    }
+    println("Success")
+    clientIDNullable = clientID
+    meNullable = keys
+    loggedIn = true
+    val storeInServer = prompt("Do you want to store your keys in the server? (y/n)")
+    if(storeInServer.toCharArray().getOrNull(0)?.toUpperCase()?.equals('Y') == true){
+        @Suppress("UNREACHABLE_CODE") val passwordFunction:() -> String = password@{
+            val readPassword: () -> CharArray = reader@ {
+                System.console()?.readPassword() ?: return@reader scan.nextLine().toCharArray()
+            }
+            while(true){
+                print("password:")
+                val a: CharArray = readPassword()
+                print("enter again:")
+                val b :CharArray = readPassword()
+                if(!a.contentEquals(b))
+                    println("Content is not equals")
+                else if(a.toString().isBlank())
+                    println("Password can not be blank")
+                else
+                    return@password a.fold("") {aa,bb -> "$aa$bb"}
+            }
+            error("kotlin is a dumbass")
+//                    return@password ""
+        }
+        val password = passwordFunction()
+        val result = socket.requestResponse(SubmitKeyFileDataBlob(
+            clientID,
+            me.serialize(),
+            DigestUtils.sha256Hex(password),
+            Request.Response.SUBMIT_KEY_FILE.intent
+        ),me)
+            .mapFromJson<Status>()
+            .printStatus("Succeeded!")
+            .block()!!
+        if(result.failed){
+            return
+        }
+        println("Successfully store in cloud!")
+    }
+    val storeInClient = prompt("Do you want to store your keys locally? (y/n)")
+    if(storeInClient.toCharArray().getOrNull(0)?.toUpperCase()?.equals('Y') == true) {
+        var keyFile = prompt("Directory to store keys in (.)")
+        if (keyFile.isBlank())
+            keyFile = "./"
+        if (!keyFile.endsWith("/"))
+            keyFile = "$keyFile/"
+
+        val file = File("$keyFile$clientID.gc.key")
+        file.writeText(me.serialize(), Charset.forName("UTF-8"))
+        println("Created file $keyFile$clientID.gs.key")
+    }
+}
 
 fun verify(){
     print("ID of the data you want to sign? ")
@@ -391,7 +465,7 @@ fun stringy(a :Action,blockchain: Blockchain):String{
     }
 }
 
-fun submitDataMenu() {
+private fun submitDataMenu() {
     print("Enter key for data (? for help )")
     val input = scan.nextLine().trim()
     if(input.isBlank()){
@@ -400,14 +474,14 @@ fun submitDataMenu() {
     }
     if(input == "?"){
         println("Valid keys:")
-        validKeys.forEach { println("   $it") }
+        validDataKeys.forEach { println("   $it") }
         println("Type \"nevermind\" to exit")
         return submitDataMenu()
     }
     if(input == "nevermind"){
         return
     }
-    if(!validKeys.contains(input)){
+    if(!validDataKeys.contains(input)){
         println("\"$input\" is not a valid key")
         return submitDataMenu()
     }
@@ -467,11 +541,7 @@ fun minerMenu() {
         when (val inn = scan.nextLine()) {
             "start" -> {
                 if (miner == null) {
-                    miner = ThreadedMiner(
-                        socket = socket,
-                        person = me,
-                        clientID = clientID
-                    )
+                    miner = null as ThreadedMiner//TODO
                 }
                 println("Starting miner")
                 miner?.start() ?: println("Error starting miner")
