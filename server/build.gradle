@@ -37,3 +37,12 @@ dependencies {
     implementation "com.discord4j:discord4j-core:3.0.3"
 }
 
+
+jar {
+    manifest {
+        attributes(
+                'Class-Path': configurations.compile.collect { it.getName() }.join(' '),
+                'Main-Class': 'com.gumbocoin.server.MainKt'
+        )
+    }
+}

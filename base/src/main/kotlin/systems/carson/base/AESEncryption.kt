@@ -30,27 +30,27 @@ data class EncryptedAESStrings(
 
 object AESEncryption{
 
-    const val keySize = 16
+    private const val KEY_SIZE = 16
 //    const val AES_CIPHER = "AES/CTR/PKCS5Padding"
 
-
     fun decryptAES(data: EncryptedAESBytes, secretKey :ByteArray): ByteArray {
-        val paddedSecretKey = secretKey + ByteArray(keySize - secretKey.size) { 0x0 }
+        val paddedSecretKey = secretKey + ByteArray(KEY_SIZE - secretKey.size) { 0x0 }
         val iv = data.iv
         val ivParameterSpec = IvParameterSpec(iv)
 
-        val keySpec = SecretKeySpec(paddedSecretKey, 0, keySize, "AES")
+        val keySpec = SecretKeySpec(paddedSecretKey, 0, KEY_SIZE, "AES")
 
         val aesCipher = Cipher.getInstance(Person.AES_CIPHER)
         aesCipher.init(Cipher.DECRYPT_MODE, keySpec, ivParameterSpec)
 
         return aesCipher.doFinal(data.bytes)
     }
+
     fun encryptAES(data :ByteArray, secretKey: ByteArray):EncryptedAESBytes {
-        val paddedSecretKey = secretKey + ByteArray(keySize - secretKey.size) { 0x0 }
+        val paddedSecretKey = secretKey + ByteArray(KEY_SIZE - secretKey.size) { 0x0 }
         val iv = ByteArray(16)
         SecureRandom.getInstanceStrong().nextBytes(iv)
-        val keySpec = SecretKeySpec(paddedSecretKey, 0, keySize, "AES")
+        val keySpec = SecretKeySpec(paddedSecretKey, 0, KEY_SIZE, "AES")
 
 
 
