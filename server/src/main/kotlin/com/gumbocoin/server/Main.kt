@@ -1,10 +1,13 @@
 package com.gumbocoin.server
 
 
+import com.xenomachina.argparser.ArgParser
+import com.xenomachina.argparser.ShowHelpException
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
+import java.io.PrintWriter
 import java.time.Duration
 import java.time.Instant
 
@@ -18,11 +21,12 @@ val blockchain: Blockchain
 
 val diff: Long
     get() {
-        if(FlagManager.debugFlags.contains(DebugFlags.LOW_DIFF)){
+        if(inputArguments.devFlags.contains(DevFlags.LOW_DIFF)){
             return defaultDifficulty
         }
-        if (blockchain.blocks.size < blocksToTake)//start out like this and get a feel for the power
+        if (blockchain.blocks.size < blocksToTake){//start out like this and get a feel for the power
             return defaultDifficulty
+        }
         val lastFiveBLocks = blockchain.blocks.subList(blockchain.blocks.size - blocksToTake,blockchain.blocks.size)
         val time:Duration = Duration
             .between(Instant.ofEpochMilli(lastFiveBLocks.first().timestamp),
@@ -67,11 +71,28 @@ fun sendUpdates() {
 val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionUpdate>()
 
 
-fun main() {
-    println("STARTING SERVER: MODE: ${ReleaseManager.release}")
+lateinit var inputArguments :InputArguments
+
+fun main(args :Array<String>) {
+    try {
+        inputArguments = ArgParser(args).parseInto(::InputArguments)
+    }catch(e :ShowHelpException){
+        val writer =  PrintWriter(System.err)
+        e.printUserMessage(
+            writer = writer ,
+            programName = "server",
+            columns = 1000
+        )
+        writer.flush()
+        System.out.flush()
+        System.exit(0)
+    }
+        println("STARTING SERVER: MODE: ${inputArguments.release}")
 
     val outputLogger = OutputGLogger()
     outputLogger.setLevel(GLevel.DEBUG)
+
+    //parse the arguments
 
     GManager.addLoggerImpl(outputLogger)
     val closable = RSocketFactory.receive()
@@ -94,7 +115,7 @@ fun main() {
     discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
 
-    logger.log(GLevel.IMPORTANT, "Server started. Mode: ${ReleaseManager.release}")
+    logger.log(GLevel.IMPORTANT, "Server started. Mode: ${inputArguments.release}")
 
     (closable.block() ?: error("CloseableChannel did not complete with a value"))
         .onClose()

@@ -1,15 +1,15 @@
 package com.gumbocoin.server
 
 import systems.carson.base.Person
-import systems.carson.base.ReleaseManager.release
 import java.io.File
 import java.nio.charset.Charset
 
 
 object KeyManager {
-    private val rootDirectory by lazy { System.getenv("KEY_HOME") }
+    private val rootDirectory by lazy { inputArguments.keyDir.absolutePath }
+    private val release by lazy { inputArguments.release }
     private val keyDirectory by lazy {
-        if (rootDirectory.endsWith("/"))
+        if (rootDirectory.endsWith("/"))//handle...it
             rootDirectory + release.str + "/"
         else
             rootDirectory + "/" + release.str

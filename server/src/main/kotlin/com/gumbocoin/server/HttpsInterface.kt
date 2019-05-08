@@ -26,6 +26,10 @@ fun startHttps(): Killable {
     get("/") { _, _ ->
         prepForHtml(
             """
+                Database:${inputArguments.database}
+                Release:${inputArguments.release}
+                DevFlags:${inputArguments.devFlags}
+
             <a href="/hello">hello</a>
             <a href="/blockchain">blockchain</a>
             <a href="/block">block</a>
