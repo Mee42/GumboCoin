@@ -1,9 +1,8 @@
 package com.gumbocoin.cli.new
 
-import com.gumbocoin.cli.ThreadedMiner
+import com.gumbocoin.cli.*
 import com.gumbocoin.cli.new.dsl.mainConsole
-import com.gumbocoin.cli.requestResponse
-import com.gumbocoin.cli.requestStream
+import com.xenomachina.argparser.ArgParser
 import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
@@ -13,12 +12,13 @@ import java.time.Duration
 import java.util.*
 
 
-fun main() {
+fun main(args :Array<String>) {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
 
     val socket = GSocket()
-    val context = Context.create(socket)
+    val context = Context.create(socket,args)
     socket.setContext(context)
+    context.initServerKey()
 
     Flux.interval(Duration.ofMinutes(1))
         .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "default")) }
@@ -48,10 +48,12 @@ class ConsoleAction(
     val runner :Runner)
 
 
+
 class Context private constructor(var socket: GSocket,
                                   var scan: Scanner,
                                   private var credentialsNullable :Credentials? = null,
-                                  var threadedMiner :ThreadedMiner? = null){
+                                  var threadedMiner :ThreadedMiner? = null,
+                                  val arguments :PassedArguments){
     val isLoggedIn
         get() = credentialsNullable != null
     val credentials
@@ -65,14 +67,15 @@ class Context private constructor(var socket: GSocket,
     // we should stay away from global states, right
     companion object{
         private var created = false
-        fun create(socket: GSocket):Context{
+        fun create(socket: GSocket, args :Array<String>):Context{
             if(created)
                 error("Can not create more then one instance of Context")
             created = true
             return Context(
                 socket = socket,
                 scan = Scanner(System.`in`),
-                credentialsNullable = null)
+                credentialsNullable = null,
+                arguments = ArgParser(args).parseInto(::PassedArguments))
         }
     }
 

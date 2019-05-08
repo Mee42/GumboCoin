@@ -24,3 +24,5 @@ class KindaLazy<T>(initializer: () -> T) {
 }
 
 fun <T> kindaLazy(initializer: () -> T) = KindaLazy(initializer)
+
+//isn't really used because it's bad af - remove?

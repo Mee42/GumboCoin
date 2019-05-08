@@ -24,6 +24,8 @@ dependencies {
     implementation group: 'commons-codec', name: 'commons-codec', version: '1.12'
 
 
+    implementation "com.xenomachina:kotlin-argparser:2.0.7"
+
 }
 
 

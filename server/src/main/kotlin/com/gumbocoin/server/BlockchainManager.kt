@@ -1,7 +1,5 @@
 package com.gumbocoin.server
 
-import com.gumbocoin.server.BlockchainManager.BlockchainSource.*
-import com.mongodb.client.model.Filters
 import org.bson.Document
 import reactor.core.publisher.toFlux
 import reactor.core.publisher.toMono
@@ -9,26 +7,17 @@ import systems.carson.base.*
 import java.nio.charset.Charset
 import kotlin.concurrent.thread
 import org.bson.json.JsonWriterSettings
+import com.gumbocoin.server.BlockchainSource.*
 
+enum class BlockchainSource{
+    DATABASE,
+    MEMORY,
+    WIPE;//like DATABASE but it wipes the database on startup and then crashes
+}
 
 object BlockchainManager {
-    private const val USE_DATABASE_FLAG = "USE_DATABASE"
 
-    private enum class BlockchainSource{
-        DATABASE,
-        MEMORY,
-        WIPE;//like DATABASE but it wipes the database on startup
-        companion object{
-            val default = MEMORY
-        }
-    }
-
-    private val flag  by lazy {
-        val flag = System.getenv(USE_DATABASE_FLAG).toUpperCase()
-        if(flag.isBlank())
-            return@lazy BlockchainSource.default
-        return@lazy valueOf(flag)
-    }
+    val flag by lazy { inputArguments.database }
 
     var blockchain :Blockchain = generateCorrectBlockchain()
         set(newBlockchain){
@@ -58,9 +47,10 @@ object BlockchainManager {
     }
 
     private fun resetAndCrash():Blockchain {
-        if(ReleaseManager.release == Release.MASTER){
+        if(inputArguments.release == Release.MASTER){
             error("YOU IDIOT!\n" +
-                    "Think about this for a solid ")
+                    "Think about this for a solid minute \n" +
+                    "then do it manually")
         }
         Mongo.blockchain.drop()
             .toMono()

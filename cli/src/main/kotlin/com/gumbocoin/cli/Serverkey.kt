@@ -1,11 +1,20 @@
 package com.gumbocoin.cli
 
+import com.gumbocoin.cli.new.Context
 import systems.carson.base.Person
 import systems.carson.base.Release.BETA
 import systems.carson.base.Release.DEV
-import systems.carson.base.ReleaseManager
 
-val server = (mapOf(
+private var keyCache :Person? = null
+
+val server :Person
+    get() = keyCache!!
+
+fun Context.initServerKey(){
+    keyCache = Person.fromKeyFile(serverMap[arguments.release] ?: error("Can't find keyfile for release ${arguments.release}"))
+}
+
+private val serverMap = mapOf(
     BETA to """
 --- BEGIN PUBLIC KEY ---
 MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAgWtrqoCVpKdnckYR7ulMmup2N/AoC+Rc+9RV
@@ -24,5 +33,4 @@ IogKOhlORdFw4TS9r2hREd/my8BTi9wmzYZNldHvQGaNN4ZjGsoKd/tuW6XFayw0c9rQe8VCX7h+8Uvm
 yr6x4DylpfbUXJ+mXIYK+B3YB6v+Ab2YDL5Wo7tC9AgETaWlYUlYGIboRfv0QkDGIQIDAQAB
 --- END PUBLIC KEY ---
     """.trimIndent()
-)[ReleaseManager.release] ?: error("No key for release"))
-    .let { Person.fromKeyFile(it) }
+)

@@ -33,7 +33,7 @@ class DiscordLogger : GLog {
         }
     }
 
-    val sub =
+    init {
         Flux.interval(Duration.ofSeconds(1))
             .map {
                 synchronized(lock) {
@@ -57,5 +57,6 @@ class DiscordLogger : GLog {
 //            .map { println("Sending: $it");it }
             .flatMap { message -> DiscordManager.logChannel.flatMap { channel -> channel.createMessage(message) } }
             .subscribe()
+    }
 
 }

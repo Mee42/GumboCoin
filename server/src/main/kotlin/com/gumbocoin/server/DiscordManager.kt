@@ -6,9 +6,9 @@ import discord4j.core.`object`.entity.TextChannel
 import discord4j.core.`object`.util.Snowflake
 import reactor.core.publisher.Mono
 import systems.carson.base.Release.*
-import systems.carson.base.ReleaseManager.release
 
 object DiscordManager {
+    private val release by lazy { inputArguments.release }
     val client: DiscordClient =
         DiscordClientBuilder(KeyManager.discord).build()
 
