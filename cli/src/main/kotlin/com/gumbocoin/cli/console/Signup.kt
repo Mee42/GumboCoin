@@ -1,7 +1,6 @@
-package com.gumbocoin.cli.new.dsl
+package com.gumbocoin.cli.console
 
 import com.gumbocoin.cli.*
-import com.gumbocoin.cli.new.*
 import org.apache.commons.codec.digest.DigestUtils
 import systems.carson.base.*
 import java.io.File
@@ -10,7 +9,7 @@ import java.util.*
 
 
 @Suppress("UNREACHABLE_CODE")
-private val passwordFunction:(Context) -> String = fun(context :Context):String {
+private val passwordFunction:(Context) -> String = fun(context : Context):String {
     val readPassword: () -> CharArray = reader@ {
         System.console()?.readPassword() ?: return@reader context.scan.nextLine().toCharArray()
     }
@@ -39,7 +38,8 @@ val signup = filteredRunner {
         println("clientID: $clientID")
         val keys = Person.generateNew()
         val status = context.socket.requestResponse(
-            SignUpDataBlob(clientID,SignUpAction(clientID,keys.publicKeyBase64())), keys)
+            SignUpDataBlob(clientID, SignUpAction(clientID, keys.publicKeyBase64())), keys
+        )
             .mapFromJson<Status>()
             .block()
         when {
@@ -50,8 +50,8 @@ val signup = filteredRunner {
             }
             else -> {
                 println("Success!")
-                context.setDaCredentials(Credentials(clientID,keys))
-                while(!saveKeys(context)){
+                context.setDaCredentials(Credentials(clientID, keys))
+                while (!saveKeys(context)) {
                     println("you need to save it somewhere, or you will be locked out of your account")
                     println("You can always upload to the cloud later")
                 }
@@ -61,16 +61,19 @@ val signup = filteredRunner {
     }
 }
 
-fun saveKeys(context :Context):Boolean{
+fun saveKeys(context : Context):Boolean{
     var saved = 0
     split {
         one = filteredRunner {
-            yes("Do you want to save the keys on the server?\n" +
-                    "Only people with the password will have access to it")
+            yes(
+                "Do you want to save the keys on the server?\n" +
+                        "Only people with the password will have access to it"
+            )
             runnerr {
                 val password = passwordFunction(context)
                 val serializedKeys = context.credentials.keys.serialize().toByteArray(Charset.forName("UTF-8"))
-                val encryptedKeyFile = AESEncryption.encryptAES(serializedKeys,password.toByteArray(Charset.forName("UTF-8")))
+                val encryptedKeyFile =
+                    AESEncryption.encryptAES(serializedKeys, password.toByteArray(Charset.forName("UTF-8")))
 
                 val result = it.socket.requestResponse(
                     SubmitKeyFileDataBlob(
@@ -78,13 +81,14 @@ fun saveKeys(context :Context):Boolean{
                         serialize(encryptedKeyFile.toStrings()),
                         DigestUtils.sha256Hex(password),
                         Request.Response.SUBMIT_KEY_FILE.intent
-                    ), context.credentials.keys)
+                    ), context.credentials.keys
+                )
                     .mapFromJson<Status>()
                     .printStatus("Succeeded!")
                     .block()!!
-                if(result.failed){
+                if (result.failed) {
                     println("Failed to save to cloud. You should save locally, and then publish it to the could after")
-                }else {
+                } else {
                     println("Successfully store in cloud!")
                     saved++
                 }
@@ -103,3 +107,4 @@ fun saveKeys(context :Context):Boolean{
     }.run(context)
     return saved > 0
 }
+

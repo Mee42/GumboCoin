@@ -1,27 +1,27 @@
-package com.gumbocoin.cli.new.dsl
+package com.gumbocoin.cli.console
 
 import com.gumbocoin.cli.*
-import com.gumbocoin.cli.new.Context
-import com.gumbocoin.cli.new.Runner
-import com.gumbocoin.cli.new.filteredRunner
-import com.gumbocoin.cli.new.runner
+import com.gumbocoin.cli.Context
+import com.gumbocoin.cli.Runner
+import com.gumbocoin.cli.filteredRunner
+import com.gumbocoin.cli.runner
 import systems.carson.base.*
 import java.nio.charset.Charset
 import java.util.*
 import java.util.concurrent.Callable
 
-private val dataa :Runner
+private val dataa : Runner
     get() = data
 
 var data: Runner = runner {
     print("Enter key for data (? for help )")
     val input = it.scan.nextLine().trim()
-    if(input.isBlank()){
+    if (input.isBlank()) {
         println("Can't accept that as a key")
         dataa.run(it)
         return@runner
     }
-    if(input == "?"){
+    if (input == "?") {
         println("Valid keys:")
         validDataKeys.forEach { println("   $it") }
         println("Type \"nevermind\" to exit")
@@ -29,16 +29,16 @@ var data: Runner = runner {
         return@runner
 
     }
-    if(input == "nevermind"){
+    if (input == "nevermind") {
         return@runner
     }
-    if(!validDataKeys.contains(input)){
+    if (!validDataKeys.contains(input)) {
         println("\"$input\" is not a valid key")
         dataa.run(it)
         return@runner
     }
     @Suppress("UNREACHABLE_CODE")
-    val value =  Callable<String> {
+    val value = Callable<String> {
         while (true) {
             print("Value: ")
             val inn = it.scan.nextLine().trim()
@@ -71,7 +71,7 @@ var data: Runner = runner {
         )
         .mapFromJson<Status>()
         .block() ?: error("Didn't get a response from the server")
-    if(!response.failed)
+    if (!response.failed)
         println("Data added successfully!")
     else {
         println("Data submission failed\n")
@@ -95,7 +95,7 @@ private fun verify(context : Context){
         println("Not a valid ID")
         return
     }
-    verify(id,context)
+    verify(id, context)
 }
 private fun verify(id :String,context: Context){
     val blockchain = context.socket.requestResponse(RequestDataBlob(Request.Response.BLOCKCHAIN, context.credentials.clientID),context.credentials.keys)

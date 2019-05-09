@@ -1,6 +1,5 @@
 package com.gumbocoin.cli
 
-import com.gumbocoin.cli.new.Context
 import systems.carson.base.Person
 import systems.carson.base.Release.BETA
 import systems.carson.base.Release.DEV
