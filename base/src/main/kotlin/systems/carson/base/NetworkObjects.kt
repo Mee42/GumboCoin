@@ -9,7 +9,10 @@ import java.util.*
 import kotlin.reflect.KClass
 
 
-const val PORT = 48626
+val PORT = mapOf(
+    Release.MASTER to 48625,
+    Release.BETA to 48626,
+    Release.DEV to 48627)
 
 open class RequestDataBlob(
     val intent: String,

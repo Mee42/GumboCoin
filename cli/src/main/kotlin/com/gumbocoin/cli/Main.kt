@@ -50,7 +50,7 @@ class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
     private val socket :RSocket by lazy { RSocketFactory.connect()
-        .transport(TcpClientTransport.create("localhost", PORT))
+        .transport(TcpClientTransport.create("72.66.54.109", PORT.getValue(this.context.arguments.release)))
         .start()
         .block()!! }
 
