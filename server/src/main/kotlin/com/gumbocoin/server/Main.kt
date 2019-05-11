@@ -92,9 +92,11 @@ fun main(args :Array<String>) {
     val outputLogger = OutputGLogger()
     outputLogger.setLevel(GLevel.DEBUG)
 
-    //parse the arguments
+     //parse the arguments
 
     GManager.addLoggerImpl(outputLogger)
+
+
     val closable = RSocketFactory.receive()
         .acceptor(MasterHandler())
         .transport(TcpServerTransport.create("0.0.0.0", PORT))

@@ -1,12 +1,8 @@
-package com.gumbocoin.cli.new.dsl
+package com.gumbocoin.cli.console
 
 import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.gumbocoin.cli.*
-import com.gumbocoin.cli.new.Credentials
-import com.gumbocoin.cli.new.filteredRunner
-import com.gumbocoin.cli.new.runner
-import com.gumbocoin.cli.new.switchy
 import org.apache.commons.codec.digest.DigestUtils
 import systems.carson.base.*
 import java.io.File
@@ -25,20 +21,28 @@ val login = filteredRunner {
             val clientID = prompt("ClientID")
             val password = prompt("Password")
             val got = context.socket.requestResponse(
-                StringDataBlob("defaultID", DigestUtils.sha256Hex(password) + ":" + clientID, Request.Response.GET_KEY_FILE.intent),
-                Person.default)
+                StringDataBlob(
+                    "defaultID",
+                    DigestUtils.sha256Hex(password) + ":" + clientID,
+                    Request.Response.GET_KEY_FILE.intent
+                ),
+                Person.default
+            )
                 .block()
-            if(got == null){
+            if (got == null) {
                 println("Didn't get a response from the server")
-            }else {
+            } else {
                 try {
                     val str = Gson().fromJson(got.trimAESPadding(), SendableString::class.java)
-                    if(str?.value == null)
+                    if (str?.value == null)
                         throw JsonSyntaxException("Fuck, why wasn't this caught?")
                     val decrypted = deserialize<EncryptedAESStrings>(str.value).toBytes()
-                    val plaintext = AESEncryption.decryptAES(decrypted,password.toByteArray(Charset.forName("UTF-8")))//TODO make password byte[] or char[]
+                    val plaintext = AESEncryption.decryptAES(
+                        decrypted,
+                        password.toByteArray(Charset.forName("UTF-8"))
+                    )//TODO make password byte[] or char[]
                     val person = Person.fromKeyFile(plaintext.toString(Charset.forName("UTF-8")))
-                    context.setDaCredentials(Credentials(clientID,person))
+                    context.setDaCredentials(Credentials(clientID, person))
                     println("Logged in successfully!")
                 } catch (e: JsonSyntaxException) {
                     val status = Sendable.fromJson<Status>(got)
@@ -77,7 +81,7 @@ val login = filteredRunner {
                 .block()
             if (result == true) {
                 println("Logged in successfully")
-                context.setDaCredentials(Credentials(clientID,person))
+                context.setDaCredentials(Credentials(clientID, person))
             } else {
                 println("Couldn't verify account. Login unsuccessful")
             }

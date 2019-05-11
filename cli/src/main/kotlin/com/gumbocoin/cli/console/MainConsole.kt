@@ -1,15 +1,13 @@
-package com.gumbocoin.cli.new.dsl
+package com.gumbocoin.cli.console
 
 import com.gumbocoin.cli.*
-import com.gumbocoin.cli.new.console
-import com.gumbocoin.cli.new.filteredRunner
-import com.gumbocoin.cli.new.runner
-import com.gumbocoin.cli.new.switchy
+import com.gumbocoin.cli.console
+import com.gumbocoin.cli.filteredRunner
+import com.gumbocoin.cli.runner
+import com.gumbocoin.cli.switchy
 import systems.carson.base.*
 import java.time.Duration
 import java.time.Instant
-import java.util.*
-import java.util.concurrent.Callable
 
 /**
  * This is stuff that has to deal with logging in, logging out, an
@@ -67,7 +65,7 @@ val mainConsole = console {
         runner = filteredRunner {
             conditional("You need to be logged in") { it.isLoggedIn }
             runnerr {
-                if(it.threadedMiner == null){
+                if (it.threadedMiner == null) {
                     it.threadedMiner = ThreadedMiner(it)
                 }
                 it.threadedMiner?.start()
@@ -86,11 +84,14 @@ val mainConsole = console {
     action {
         name = "diff"
         desc = "get the current mining difficulty"
-        runner = runner {context ->
-            context.socket.requestResponse(RequestDataBlob(
-                intent = Request.Response.DIFF.intent,
-                clientID = "defaultID"),
-                keys = Person.default)
+        runner = runner { context ->
+            context.socket.requestResponse(
+                RequestDataBlob(
+                    intent = Request.Response.DIFF.intent,
+                    clientID = "defaultID"
+                ),
+                keys = Person.default
+            )
                 .map { Sendable.fromJson<SendableInt>(it) }
                 .block()
                 .let { println(it?.value ?: "No response from the server") }
@@ -103,7 +104,7 @@ val mainConsole = console {
             conditional = { it.isLoggedIn }
             truthy = runner {
                 """
-                    miner status: ${if(it.threadedMiner?.isRunning == true) "running" else "not running"}
+                    miner status: ${if (it.threadedMiner?.isRunning == true) "running" else "not running"}
                     blocks mined: ${it.threadedMiner?.mined ?: -1}
                 """.trimIndent().let { w -> println(w) }
             }

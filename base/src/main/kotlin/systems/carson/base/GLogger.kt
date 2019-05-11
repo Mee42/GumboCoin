@@ -70,8 +70,19 @@ object GManager {
 private const val PAD = "%PAD_HERE%"
 private const val PAD_LENGTH = 15
 
+class FileGLogger :OutputGLogger(){
+    private val log = mapOf(
+        GLevel.FATAL to "/tmp/fatal.g.log",
+        GLevel.IMPORTANT to "/tmp/important.g.log",
+        GLevel.INFO to "/tmp/info.g.log",
+        GLevel.DEBUG to "/tmp/debug.g.log",
+        GLevel.WARNING to "/tmp/warning.g.log")
+    override fun print(str: String, level: GLevel) {
+        super.print(str, level)//TODO
+    }
+}
 
-class OutputGLogger : GLog {
+open class OutputGLogger : GLog {
     fun setLevel(level: GLevel) {
         levelI = level
     }
@@ -96,7 +107,7 @@ class OutputGLogger : GLog {
         print(str, information.level)
     }
 
-    private fun print(str: String, level: GLevel) {
+    protected open fun print(str: String, level: GLevel) {
         when (level) {
             GLevel.DEBUG -> println(str)
             else -> System.err.println(str)

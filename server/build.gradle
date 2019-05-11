@@ -10,9 +10,12 @@ repositories {
 }
 
 
-group = 'systems.carson'
+group = 'com.gumbocoin'
 
 version = '1.0'
+
+sourceCompatibility = 1.8
+
 
 dependencies {
     implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
