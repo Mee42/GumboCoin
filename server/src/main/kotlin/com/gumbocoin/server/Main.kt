@@ -8,8 +8,12 @@ import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.io.PrintWriter
+import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.IvParameterSpec
 import kotlin.random.Random
 
 val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
@@ -77,10 +81,28 @@ lateinit var inputArguments :InputArguments
 fun main(args :Array<String>) {
 
 
-    logger.info("Testing AES encryption")
 
     val data = Random.Default.nextBytes(16 * 16)
-    val encrypted = Person.encryptAES(data,Person.default)
+
+
+    val iv = ByteArray(16)
+    SecureRandom.getInstanceStrong().nextBytes(iv)
+    println("gen IV")
+
+    val keyGen = KeyGenerator.getInstance("AES")
+    keyGen.init(128)
+    val secretKey = keyGen.generateKey()
+    println("gen secret key")
+
+    val ivParameterSpec = IvParameterSpec(iv)
+    val aesCipher = Cipher.getInstance(Person.AES_CIPHER)
+    aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
+    println("init aes")
+
+    val final = aesCipher.doFinal(data)
+    println("did final")
+    val encrypted =  EncryptedBytes(iv, Person.encryptRSA(secretKey.encoded, Person.default), final)
+
     println("Encrypted")
     val plain = Person.default.decryptAES(encrypted)
     println("Decrypted")
