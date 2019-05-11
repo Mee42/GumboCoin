@@ -2,11 +2,14 @@ package com.gumbocoin.cli
 
 import com.gumbocoin.cli.console.mainConsole
 import com.xenomachina.argparser.ArgParser
+import com.xenomachina.argparser.ShowHelpException
 import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
 import reactor.core.publisher.Flux
 import systems.carson.base.*
+import java.io.PrintWriter
+import java.lang.RuntimeException
 import java.time.Duration
 import java.util.*
 
@@ -15,23 +18,41 @@ fun main(args :Array<String>) {
     System.setProperty(org.slf4j.simple.SimpleLogger.DEFAULT_LOG_LEVEL_KEY, "WARN")
 
     val socket = GSocket()
-    val context = Context.create(socket, args)
+
+    @Suppress("CAST_NEVER_SUCCEEDS") val passed = try {
+        ArgParser(args).parseInto(::PassedArguments)
+    }catch(e :ShowHelpException){
+        val writer =  PrintWriter(System.err)
+        e.printUserMessage(
+            writer = writer ,
+            programName = "gumbocoin",
+            columns = 1000
+        )
+        writer.flush()
+        System.out.flush()
+        System.exit(0)
+        null as PassedArguments
+    }
+
+    val context = Context.create(socket,passed)
+
     socket.setContext(context)
     context.initServerKey()
 
     Flux.interval(Duration.ofMinutes(1))
         .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "default")) }
         .subscribe()
+
     mainConsole.run(context)
 }
 
 class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
-    private val socket :RSocket = RSocketFactory.connect()
-        .transport(TcpClientTransport.create("localhost", PORT))
+    private val socket :RSocket by lazy { RSocketFactory.connect()
+        .transport(TcpClientTransport.create("72.66.54.109", PORT.getValue(this.context.arguments.release)))
         .start()
-        .block()!!
+        .block()!! }
 
     fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
     fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )
@@ -59,6 +80,7 @@ class Context private constructor(var socket: GSocket,
     val credentials
         get() = credentialsNullable!!
 
+
     fun setDaCredentials(credentials: Credentials){
         credentialsNullable = credentials
     }
@@ -67,7 +89,7 @@ class Context private constructor(var socket: GSocket,
     // we should stay away from global states, right
     companion object{
         private var created = false
-        fun create(socket: GSocket, args :Array<String>): Context {
+        fun create(socket: GSocket, args :PassedArguments): Context {
             if(created)
                 error("Can not create more then one instance of Context")
             created = true
@@ -75,7 +97,7 @@ class Context private constructor(var socket: GSocket,
                 socket = socket,
                 scan = Scanner(System.`in`),
                 credentialsNullable = null,
-                arguments = ArgParser(args).parseInto(::PassedArguments)
+                arguments = args
             )
         }
     }
