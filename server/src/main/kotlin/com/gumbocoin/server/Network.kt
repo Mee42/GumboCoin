@@ -41,7 +41,6 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
         .map { tuple ->
             networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple
         }
-//TODO START
         .map { (meta, data, clientID) ->
             Tuples.of(
                 meta,
@@ -55,7 +54,6 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
         .map { (meta, encrypted) ->
             Tuples.of(meta, serialize(encrypted.toStrings()))
         }
-//TODO END
         .map { tuple -> networkLogger.debug("encrypted:$tuple");tuple }
 
         .map { tuple -> networkLogger.debug(tuple.t2);tuple }

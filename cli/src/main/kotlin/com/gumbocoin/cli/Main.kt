@@ -162,7 +162,7 @@ interface Runner{ fun run(context: Context) }
 
 object TODORunner : Runner {
     override fun run(context: Context) {
-        TODO("not implemented")
+        error("TODO: not implemented")
     }
 }
 

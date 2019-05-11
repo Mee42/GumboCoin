@@ -80,39 +80,6 @@ lateinit var inputArguments :InputArguments
 
 fun main(args :Array<String>) {
 
-
-
-    val data = Random.Default.nextBytes(16 * 16)
-
-
-    val iv = ByteArray(16)
-    SecureRandom().nextBytes(iv)
-    println("gen IV")
-
-    val keyGen = KeyGenerator.getInstance("AES")
-    keyGen.init(128)
-    val secretKey = keyGen.generateKey()
-    println("gen secret key")
-
-    val ivParameterSpec = IvParameterSpec(iv)
-    val aesCipher = Cipher.getInstance(Person.AES_CIPHER)
-    aesCipher.init(Cipher.ENCRYPT_MODE, secretKey, ivParameterSpec)
-    println("init aes")
-
-    val final = aesCipher.doFinal(data)
-    println("did final")
-    val encrypted =  EncryptedBytes(iv, Person.encryptRSA(secretKey.encoded, Person.default), final)
-
-    println("Encrypted")
-    val plain = Person.default.decryptAES(encrypted)
-    println("Decrypted")
-    if(!data.contentEquals(plain)){
-        error("fuck")
-    }
-
-
-    System.exit(99)
-
     try {
         inputArguments = ArgParser(args).parseInto(::InputArguments)
     }catch(e :ShowHelpException){
