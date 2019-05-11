@@ -38,9 +38,9 @@ fun main(args :Array<String>) {
 
 
     //register the logger for debugging
-    val out = OutputGLogger()
-    out.setLevel(GLevel.DEBUG)
-    GManager.addLoggerImpl(out)
+//    val out = OutputGLogger()//remove it for prod
+//    out.setLevel(GLevel.DEBUG)
+//    GManager.addLoggerImpl(out)
 
     val context = Context.create(socket,passed)
 
@@ -61,7 +61,7 @@ fun main(args :Array<String>) {
 class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
-    val socket :RSocket by lazy {
+    private val socket :RSocket by lazy {
 //        println("starting connection...")
         //    println("connected")
             RSocketFactory.connect()
