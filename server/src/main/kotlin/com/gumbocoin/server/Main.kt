@@ -86,7 +86,7 @@ fun main(args :Array<String>) {
 
 
     val iv = ByteArray(16)
-    SecureRandom.getInstanceStrong().nextBytes(iv)
+    SecureRandom().nextBytes(iv)
     println("gen IV")
 
     val keyGen = KeyGenerator.getInstance("AES")
