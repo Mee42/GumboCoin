@@ -41,7 +41,6 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
         .map { tuple ->
             networkLogger.debug("data:" + tuple.t2.toString(Charset.forName("UTF-8")));tuple
         }
-
         .map { (meta, data, clientID) ->
             Tuples.of(
                 meta,
@@ -55,7 +54,6 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
         .map { (meta, encrypted) ->
             Tuples.of(meta, serialize(encrypted.toStrings()))
         }
-
         .map { tuple -> networkLogger.debug("encrypted:$tuple");tuple }
 
         .map { tuple -> networkLogger.debug(tuple.t2);tuple }
@@ -66,6 +64,7 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
             else
                 DefaultPayload.create(data, Charset.forName("UTF-8"), meta, Charset.forName("UTF-8"))
         }
+        .map { println("CCC: $it");it }
 
 private fun Flux<Tuple2<String, Payload>>.encryptBackToPerson(): Flux<Payload> =
     map { tuple -> Mono.just(tuple) }
@@ -95,6 +94,7 @@ class MasterHandler : SocketAcceptor {
         return Mono.just(object : AbstractRSocket() {
             override fun requestResponse(payload: Payload): Mono<Payload> {
                 return Mono.just(payload)
+                    .map { println("Got:${it.dataUtf8}");it }
                     .map { deserialize<Message>(it.dataUtf8) }
                     .map { message ->
                         Tuples.of(
@@ -121,6 +121,7 @@ class MasterHandler : SocketAcceptor {
                     .map { (clientID, blob) -> Tuples.of(clientID, getResponseHandler(blob).invoke(blob)) }
                     .map { itt -> networkLogger.info("Sending back:${itt.t2.dataUtf8}");itt }
                     .encryptBackToPerson()
+                    .map { println("Sending back:$it");it }
 
             }
 

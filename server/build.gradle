@@ -7,6 +7,7 @@ plugins {
 
 repositories {
     mavenCentral()
+    jcenter()
 }
 
 
@@ -25,14 +26,13 @@ dependencies {
 
     implementation 'org.mongodb:mongodb-driver-reactivestreams:1.11.0'
 
-    implementation 'io.rsocket:rsocket-core:0.11.14'
-    implementation 'io.rsocket:rsocket-transport-netty:0.11.14'
+    implementation 'io.rsocket:rsocket-core:0.12.2-RC2'
+    implementation 'io.rsocket:rsocket-transport-netty:0.12.2-RC2'
 
     implementation group: 'commons-codec', name: 'commons-codec', version: '1.12'
 
 //    implementation group: 'org.slf4j', name: 'slf4j-simple', version: '1.8.0-beta4'
     implementation group: 'org.slf4j', name: 'slf4j-api', version: '1.8.0-beta4'
-// https://mvnrepository.com/artifact/org.slf4j/slf4j-nop
     implementation group: 'org.slf4j', name: 'slf4j-nop', version: '1.8.0-beta4'
 
     implementation "com.sparkjava:spark-core:2.8.0"
@@ -40,6 +40,7 @@ dependencies {
     implementation "com.xenomachina:kotlin-argparser:2.0.7"
 
     implementation "com.discord4j:discord4j-core:3.0.3"
+
 }
 
 

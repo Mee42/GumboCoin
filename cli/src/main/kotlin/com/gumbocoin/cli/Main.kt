@@ -6,10 +6,11 @@ import com.xenomachina.argparser.ShowHelpException
 import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
+import io.rsocket.util.DefaultPayload
 import reactor.core.publisher.Flux
 import systems.carson.base.*
 import java.io.PrintWriter
-import java.lang.RuntimeException
+import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
 
@@ -34,10 +35,21 @@ fun main(args :Array<String>) {
         null as PassedArguments
     }
 
+
+
+    //register the logger for debugging
+    val out = OutputGLogger()
+    out.setLevel(GLevel.DEBUG)
+    GManager.addLoggerImpl(out)
+
     val context = Context.create(socket,passed)
 
     socket.setContext(context)
     context.initServerKey()
+
+    socket.requestResponse(RequestDataBlob(Request.Response.PING, "default"),Person.default).block()
+
+
 
     Flux.interval(Duration.ofMinutes(1))
         .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "default")) }
@@ -49,14 +61,14 @@ fun main(args :Array<String>) {
 class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
-    private val socket :RSocket by lazy {
-        println("starting connection...")
-        val x = RSocketFactory.connect()
-        .transport(TcpClientTransport.create("192.168.1.203", PORT.getValue(this.context.arguments.release)))
+    val socket :RSocket by lazy {
+//        println("starting connection...")
+        //    println("connected")
+            RSocketFactory.connect()
+        .transport(TcpClientTransport.create(IP.getValue(context.arguments.release), PORT.getValue(context.arguments.release)))
         .start()
         .block()!!
-    println("connected")
-    return@lazy x }
+    }
 
     fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
     fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )
@@ -150,7 +162,7 @@ interface Runner{ fun run(context: Context) }
 
 object TODORunner : Runner {
     override fun run(context: Context) {
-        TODO("not implemented")
+        error("TODO: not implemented")
     }
 }
 

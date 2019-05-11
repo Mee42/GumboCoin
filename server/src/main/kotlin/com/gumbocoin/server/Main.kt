@@ -8,8 +8,13 @@ import io.rsocket.transport.netty.server.TcpServerTransport
 import reactor.core.publisher.DirectProcessor
 import systems.carson.base.*
 import java.io.PrintWriter
+import java.security.SecureRandom
 import java.time.Duration
 import java.time.Instant
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.spec.IvParameterSpec
+import kotlin.random.Random
 
 val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
 const val defaultDifficulty = 5L
@@ -74,6 +79,7 @@ val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionU
 lateinit var inputArguments :InputArguments
 
 fun main(args :Array<String>) {
+
     try {
         inputArguments = ArgParser(args).parseInto(::InputArguments)
     }catch(e :ShowHelpException){
@@ -102,7 +108,7 @@ fun main(args :Array<String>) {
 
     val closable = RSocketFactory.receive()
         .acceptor(MasterHandler())
-        .transport(TcpServerTransport.create("0.0.0.0", PORT.getValue(inputArguments.release)))
+        .transport(TcpServerTransport.create(PORT.getValue(inputArguments.release)))
         .start()!!
 
     logger.info("Network initialized")
@@ -119,6 +125,11 @@ fun main(args :Array<String>) {
     val discordLogger = DiscordLogger()
     discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
+
+
+
+    logger.info("Success!")
+
 
     logger.log(GLevel.IMPORTANT, "Server started. Mode: ${inputArguments.release}")
 

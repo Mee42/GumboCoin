@@ -61,7 +61,7 @@ class Person private constructor(
         fun encryptAES(data: ByteArray, publicKey: PublicKey): EncryptedBytes {
 
             val iv = ByteArray(16)
-            SecureRandom.getInstanceStrong().nextBytes(iv)
+            SecureRandom().nextBytes(iv)
 
             val keyGen = KeyGenerator.getInstance("AES")
             keyGen.init(128)

@@ -49,7 +49,7 @@ object AESEncryption{
     fun encryptAES(data :ByteArray, secretKey: ByteArray):EncryptedAESBytes {
         val paddedSecretKey = secretKey + ByteArray(KEY_SIZE - secretKey.size) { 0x0 }
         val iv = ByteArray(16)
-        SecureRandom.getInstanceStrong().nextBytes(iv)
+        SecureRandom().nextBytes(iv)
         val keySpec = SecretKeySpec(paddedSecretKey, 0, KEY_SIZE, "AES")
 
 

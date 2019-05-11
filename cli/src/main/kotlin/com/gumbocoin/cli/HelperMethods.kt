@@ -87,7 +87,9 @@ fun RSocket.requestResponse(data: RequestDataBlob, keys: Person): Mono<String> =
         .map { network.info("Making request: $it");it }
         .map { it.toByteArray(Charset.forName("UTF-8")) }//make sure it's UTF-8, don't trust library
         .map { DefaultPayload.create(it) }
+        .map { network.debug("AAA");it }
         .flatMap { requestResponse(it) }
+        .map { network.debug("BBB");it }
         .map { it.dataUtf8 }
         .map { network.debug(it);it }
         .map { deserialize<EncryptedString>(it) }
