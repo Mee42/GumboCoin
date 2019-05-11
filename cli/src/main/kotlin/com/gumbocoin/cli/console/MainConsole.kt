@@ -22,7 +22,7 @@ val mainConsole = console {
             val response = try { context
                 .socket
                 .requestResponse(RequestDataBlob(Request.Response.PING.intent, "defaultID"))
-                .block(Duration.ofSeconds(10)) }catch(e :IllegalStateException) { null }
+                .block(Duration.ofSeconds(10)) }catch(e :IllegalStateException) { e.printStackTrace();null }
 
             val end = Instant.now()
             val dur = Duration.between(start, end).abs().toMillis()

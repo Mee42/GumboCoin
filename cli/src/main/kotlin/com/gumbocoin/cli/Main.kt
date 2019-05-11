@@ -9,7 +9,6 @@ import io.rsocket.transport.netty.client.TcpClientTransport
 import reactor.core.publisher.Flux
 import systems.carson.base.*
 import java.io.PrintWriter
-import java.lang.RuntimeException
 import java.time.Duration
 import java.util.*
 
@@ -34,6 +33,11 @@ fun main(args :Array<String>) {
         null as PassedArguments
     }
 
+    //register the logger for debugging
+    val out = OutputGLogger()
+    out.setLevel(GLevel.DEBUG)
+    GManager.addLoggerImpl(out)
+
     val context = Context.create(socket,passed)
 
     socket.setContext(context)
@@ -51,12 +55,12 @@ class GSocket{
     fun setContext(context: Context){ this.context = context }
     private val socket :RSocket by lazy {
 //        println("starting connection...")
-        val x = RSocketFactory.connect()
-        .transport(TcpClientTransport.create(IP.getValue(this.context.arguments.release), PORT.getValue(this.context.arguments.release)))
+        //    println("connected")
+            RSocketFactory.connect()
+        .transport(TcpClientTransport.create(IP.getValue(context.arguments.release), PORT.getValue(context.arguments.release)))
         .start()
         .block()!!
-//    println("connected")
-    return@lazy x }
+    }
 
     fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
     fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )
