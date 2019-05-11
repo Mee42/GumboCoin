@@ -49,10 +49,14 @@ fun main(args :Array<String>) {
 class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
-    private val socket :RSocket by lazy { RSocketFactory.connect()
-        .transport(TcpClientTransport.create("72.66.54.109", PORT.getValue(this.context.arguments.release)))
+    private val socket :RSocket by lazy {
+        println("starting connection...")
+        val x = RSocketFactory.connect()
+        .transport(TcpClientTransport.create("192.168.1.203", PORT.getValue(this.context.arguments.release)))
         .start()
-        .block()!! }
+        .block()!!
+    println("connected")
+    return@lazy x }
 
     fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)
     fun requestResponse(blob :RequestDataBlob) = requestResponse(blob, if(context.isLoggedIn) context.credentials.keys else Person.default )

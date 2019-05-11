@@ -92,6 +92,9 @@ fun main(args :Array<String>) {
     val outputLogger = OutputGLogger()
     outputLogger.setLevel(GLevel.DEBUG)
 
+    val fileLogger = FileGLogger()
+    fileLogger.setLevel(GLevel.DEBUG)
+    GManager.addLoggerImpl(fileLogger)
      //parse the arguments
 
     GManager.addLoggerImpl(outputLogger)

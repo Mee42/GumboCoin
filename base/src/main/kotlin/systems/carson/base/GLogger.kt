@@ -1,5 +1,7 @@
 package systems.carson.base
 
+import java.io.File
+
 
 enum class GLevel(val level: Int) {
     DEBUG(0),
@@ -71,14 +73,9 @@ private const val PAD = "%PAD_HERE%"
 private const val PAD_LENGTH = 15
 
 class FileGLogger :OutputGLogger(){
-    private val log = mapOf(
-        GLevel.FATAL to "/tmp/fatal.g.log",
-        GLevel.IMPORTANT to "/tmp/important.g.log",
-        GLevel.INFO to "/tmp/info.g.log",
-        GLevel.DEBUG to "/tmp/debug.g.log",
-        GLevel.WARNING to "/tmp/warning.g.log")
+    private val log = File("/tmp/glog.log")
     override fun print(str: String, level: GLevel) {
-        super.print(str, level)//TODO
+        log.appendText(str + "\n")
     }
 }
 
