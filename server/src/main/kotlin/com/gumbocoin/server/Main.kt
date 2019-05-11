@@ -75,6 +75,22 @@ val updateSource: DirectProcessor<ActionUpdate> = DirectProcessor.create<ActionU
 lateinit var inputArguments :InputArguments
 
 fun main(args :Array<String>) {
+
+
+    logger.info("Testing AES encryption")
+
+    val data = Random.Default.nextBytes(16 * 16)
+    val encrypted = Person.encryptAES(data,Person.default)
+    println("Encrypted")
+    val plain = Person.default.decryptAES(encrypted)
+    println("Decrypted")
+    if(!data.contentEquals(plain)){
+        error("fuck")
+    }
+
+
+    System.exit(99)
+
     try {
         inputArguments = ArgParser(args).parseInto(::InputArguments)
     }catch(e :ShowHelpException){
@@ -122,14 +138,6 @@ fun main(args :Array<String>) {
     GManager.addLoggerImpl(discordLogger)
 
 
-    logger.info("Testing AES encryption")
-
-    val data = Random.Default.nextBytes(16 * 16)
-    val encrypted = Person.encryptAES(data,Person.default)
-    val plain = Person.default.decryptAES(encrypted)
-    if(!data.contentEquals(plain)){
-        error("fuck")
-    }
 
     logger.info("Success!")
 
