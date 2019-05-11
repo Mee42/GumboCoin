@@ -16,13 +16,13 @@ val PORT = mapOf(
 
 val IP = mapOf(
     Release.MASTER to "72.66.54.109",
-    Release.BETA to "72.66.54.109",
+    Release.BETA to "192.168.1.203",
     Release.DEV to "localhost")
 
 
 val BIND = mapOf(
-    Release.MASTER to "72.66.54.109",
-    Release.BETA to "72.66.54.109",
+    Release.MASTER to "0.0.0.0",
+    Release.BETA to "0.0.0.0",
     Release.DEV to "0.0.0.0")
 
 
