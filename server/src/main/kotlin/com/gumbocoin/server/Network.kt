@@ -66,6 +66,7 @@ private fun Mono<Tuple2<String, Payload>>.encryptBackToPerson(): Mono<Payload> =
             else
                 DefaultPayload.create(data, Charset.forName("UTF-8"), meta, Charset.forName("UTF-8"))
         }
+        .map { println("CCC: $it");it }
 
 private fun Flux<Tuple2<String, Payload>>.encryptBackToPerson(): Flux<Payload> =
     map { tuple -> Mono.just(tuple) }
