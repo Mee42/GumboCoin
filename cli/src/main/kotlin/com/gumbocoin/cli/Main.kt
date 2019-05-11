@@ -50,12 +50,12 @@ class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
     private val socket :RSocket by lazy {
-        println("starting connection...")
+//        println("starting connection...")
         val x = RSocketFactory.connect()
-        .transport(TcpClientTransport.create("192.168.1.203", PORT.getValue(this.context.arguments.release)))
+        .transport(TcpClientTransport.create(IP.getValue(this.context.arguments.release), PORT.getValue(this.context.arguments.release)))
         .start()
         .block()!!
-    println("connected")
+//    println("connected")
     return@lazy x }
 
     fun requestResponse(blob :RequestDataBlob, keys :Person) = socket.requestResponse(blob,keys)

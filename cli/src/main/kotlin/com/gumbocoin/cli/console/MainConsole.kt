@@ -19,8 +19,11 @@ val mainConsole = console {
         desc = "pings the server"
         runner = runner { context ->
             val start = Instant.now()
-            val response =
-                context.socket.requestResponse(RequestDataBlob(Request.Response.PING.intent, "defaultID")).block()
+            val response = try { context
+                .socket
+                .requestResponse(RequestDataBlob(Request.Response.PING.intent, "defaultID"))
+                .block(Duration.ofSeconds(10)) }catch(e :IllegalStateException) { null }
+
             val end = Instant.now()
             val dur = Duration.between(start, end).abs().toMillis()
             if (response != null) {

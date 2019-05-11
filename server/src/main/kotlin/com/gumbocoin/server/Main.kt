@@ -102,7 +102,7 @@ fun main(args :Array<String>) {
 
     val closable = RSocketFactory.receive()
         .acceptor(MasterHandler())
-        .transport(TcpServerTransport.create("0.0.0.0", PORT.getValue(inputArguments.release)))
+        .transport(TcpServerTransport.create(BIND.getValue(inputArguments.release), PORT.getValue(inputArguments.release)))
         .start()!!
 
     logger.info("Network initialized")
