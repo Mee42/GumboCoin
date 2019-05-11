@@ -17,7 +17,7 @@ val PORT = mapOf(
 val IP = mapOf(
     Release.MASTER to "72.66.54.109",
 //    Release.BETA to "192.168.1.203",
-    Release.BETA to "192.168.1.203",
+    Release.BETA to "72.66.54.109",
     Release.DEV to "localhost")
 
 
