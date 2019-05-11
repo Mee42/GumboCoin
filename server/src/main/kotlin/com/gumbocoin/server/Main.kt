@@ -10,6 +10,7 @@ import systems.carson.base.*
 import java.io.PrintWriter
 import java.time.Duration
 import java.time.Instant
+import kotlin.random.Random
 
 val targetTimeBetweenBlocks: Duration = Duration.ofMinutes(1)
 const val defaultDifficulty = 5L
@@ -119,6 +120,19 @@ fun main(args :Array<String>) {
     val discordLogger = DiscordLogger()
     discordLogger.setLevel(GLevel.WARNING)
     GManager.addLoggerImpl(discordLogger)
+
+
+    logger.info("Testing AES encryption")
+
+    val data = Random.Default.nextBytes(16 * 16)
+    val encrypted = Person.encryptAES(data,Person.default)
+    val plain = Person.default.decryptAES(encrypted)
+    if(!data.contentEquals(plain)){
+        error("fuck")
+    }
+
+    logger.info("Success!")
+
 
     logger.log(GLevel.IMPORTANT, "Server started. Mode: ${inputArguments.release}")
 
