@@ -67,6 +67,7 @@ fun startHttps(): Killable {
                     .filter { w -> w.clientID == it.id })
         })
     }
+    get("/signatures") {_,_ -> }
     get("/user/:id") req@{ req, _ ->
 
         val id = req.params("id")

@@ -35,22 +35,28 @@ val mainConsole = console {
     }
     action {
         name = "money"
-        desc = "get your current balance"
-        runner = filteredRunner {
-            conditional("Not logged in") { it.isLoggedIn }
-            final = runner { (socket, _, _, credentials) ->
-                val money = socket.requestResponse(
-                    StringDataBlob(
-                        clientID = credentials.clientID,
-                        intent = Request.Response.MONEY.intent,
-                        value = credentials.clientID
-                    ), credentials.keys
-                )
-                    .mapFromJson<SendableInt>()
-                    .block()?.value ?: -1
-                println("${credentials.clientID} has $money Gumbocoin" + if (money == 1) "" else "s")
+        desc = "check balance"
+        runner = runner { context ->
+            val loggedIn = context.isLoggedIn
+            val clientID = if(loggedIn) context.credentials.clientID else ""
+            val str = if(loggedIn) "($clientID)" else ""
+            var id = promptForString("ID $str") { it.isNotBlank().or(loggedIn).toError("No default if not logged in") }
+            if(id.isBlank() && loggedIn){
+                id = context.credentials.clientID
             }
+
+            val money = context.socket.requestResponse(
+                StringDataBlob(
+                    clientID = if(loggedIn) context.credentials.clientID else "defaultID",
+                    intent = Request.Response.MONEY.intent,
+                    value = id
+                ), if(loggedIn) context.credentials.keys else Person.default
+            )
+                .mapFromJson<SendableInt>()
+                .block()?.value ?: -1
+            println("$id has $money Gumbocoin" + if (money == 1) "" else "s")
         }
+
     }
     action {
         name = "signup"
