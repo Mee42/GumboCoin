@@ -6,9 +6,11 @@ import com.xenomachina.argparser.ShowHelpException
 import io.rsocket.RSocket
 import io.rsocket.RSocketFactory
 import io.rsocket.transport.netty.client.TcpClientTransport
+import io.rsocket.util.DefaultPayload
 import reactor.core.publisher.Flux
 import systems.carson.base.*
 import java.io.PrintWriter
+import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
 
@@ -33,6 +35,8 @@ fun main(args :Array<String>) {
         null as PassedArguments
     }
 
+
+
     //register the logger for debugging
     val out = OutputGLogger()
     out.setLevel(GLevel.DEBUG)
@@ -42,6 +46,10 @@ fun main(args :Array<String>) {
 
     socket.setContext(context)
     context.initServerKey()
+
+    socket.requestResponse(RequestDataBlob(Request.Response.PING, "default"),Person.default).block()
+
+
 
     Flux.interval(Duration.ofMinutes(1))
         .flatMap { socket.requestResponse(RequestDataBlob(Request.Response.PING, "default")) }
@@ -53,7 +61,7 @@ fun main(args :Array<String>) {
 class GSocket{
     private lateinit var context : Context
     fun setContext(context: Context){ this.context = context }
-    private val socket :RSocket by lazy {
+    val socket :RSocket by lazy {
 //        println("starting connection...")
         //    println("connected")
             RSocketFactory.connect()

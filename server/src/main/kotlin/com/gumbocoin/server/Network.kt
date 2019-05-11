@@ -95,6 +95,7 @@ class MasterHandler : SocketAcceptor {
         return Mono.just(object : AbstractRSocket() {
             override fun requestResponse(payload: Payload): Mono<Payload> {
                 return Mono.just(payload)
+                    .map { println("Got:${it.dataUtf8}");it }
                     .map { deserialize<Message>(it.dataUtf8) }
                     .map { message ->
                         Tuples.of(
