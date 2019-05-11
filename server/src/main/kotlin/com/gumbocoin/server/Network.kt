@@ -122,6 +122,7 @@ class MasterHandler : SocketAcceptor {
                     .map { (clientID, blob) -> Tuples.of(clientID, getResponseHandler(blob).invoke(blob)) }
                     .map { itt -> networkLogger.info("Sending back:${itt.t2.dataUtf8}");itt }
                     .encryptBackToPerson()
+                    .map { println("Sending back:$it");it }
 
             }
 
