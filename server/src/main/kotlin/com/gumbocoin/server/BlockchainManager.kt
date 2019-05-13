@@ -17,7 +17,7 @@ enum class BlockchainSource{
 
 object BlockchainManager {
 
-    val flag by lazy { inputArguments.database }
+    private val flag by lazy { inputArguments.database }
 
     var blockchain :Blockchain = generateCorrectBlockchain()
         set(newBlockchain){
