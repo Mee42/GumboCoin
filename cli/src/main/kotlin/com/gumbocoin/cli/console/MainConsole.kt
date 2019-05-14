@@ -134,6 +134,14 @@ val mainConsole = console {
         desc = "verify someone else's data"
         runner = verify
     }
+    action {
+        name = "keyfile"
+        desc = "print keyfile to the console"
+        runner = filteredRunner {
+            conditional("You need to be logged in") { it.isLoggedIn }
+            runnerr { it.credentials.keys.serialize().let { str -> println(str) }}
+        }
+    }
 }
 
 
