@@ -1,0 +1,1 @@
+browserify ./website/src/js/main.js > ./website/build/js/mainf.js

@@ -107,9 +107,15 @@ fun startHttps(): Killable {
     }
 
 
+
+    before("/*") { _, response -> response.header("Access-Control-Allow-Origin", "*") }
+
+
+    initServerHttpsInterface()
+
     notFound(error("404 - page not found"))
 
-    return object : Killable {
+    return object : Killable {//TODO refactor
         override fun kill() {}
     }
 
