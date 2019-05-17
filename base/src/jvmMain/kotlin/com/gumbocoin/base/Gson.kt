@@ -5,14 +5,17 @@ import java.lang.reflect.Type
 
 
 actual fun serialize(obj: Any): String {
-    return GsonHolder.serializingGson.toJson(obj)
+    return GsonHolder.def.toJson(obj)
 }
 
 actual fun prettyPrint(obj: Any): String {
     return GsonHolder.prettySerializingGson.toJson(obj)
 }
+actual inline fun <reified T> rawDeserialize(json :String):T{
+    return GsonHolder.def.fromJson(json,T::class.java)
+}
 
-actual inline fun <reified T> deserialize(json: String): T {
+actual inline fun <reified T :Sendable> deserialize(json: String): T {
     return GsonHolder.deserializingGson.fromJson(json, T::class.java)
 }
 
@@ -25,13 +28,13 @@ fun JsonObject.int(s: String): Int = getAsJsonPrimitive(s).asInt
 
 
 object GsonHolder {
-    val serializingGson: Gson by lazy { serializingGsonProducer.invoke().create() }
-    val prettySerializingGson: Gson by lazy { serializingGsonProducer.invoke().setPrettyPrinting().create() }
+    val def: Gson by lazy { defProducer.invoke().create() }
+    val prettySerializingGson: Gson by lazy { defProducer.invoke().setPrettyPrinting().create() }
 
     val deserializingGson: Gson by lazy { deserializingGsonProducer.invoke().create() }
 
 
-    private val serializingGsonProducer: () -> GsonBuilder = { GsonBuilder() }
+    private val defProducer: () -> GsonBuilder = { GsonBuilder() }
     private val deserializingGsonProducer: () -> GsonBuilder = {
         GsonBuilder()
             .registerTypeAdapter(Action::class.java, object : JsonDeserializer<Action> {

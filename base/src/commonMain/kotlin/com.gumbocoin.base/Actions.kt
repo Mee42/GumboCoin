@@ -9,7 +9,7 @@ enum class ActionType {
 }
 
 
-open class Action(val type: ActionType) {
+open class Action(val type: ActionType) :Sendable {
     companion object
 }
 

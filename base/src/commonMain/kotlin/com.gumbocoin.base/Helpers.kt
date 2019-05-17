@@ -2,7 +2,10 @@ package com.gumbocoin.base
 
 expect fun serialize(obj :Any):String
 expect fun prettyPrint(obj :Any):String
-expect inline fun <reified T> deserialize(json :String):T
+expect inline fun <reified T :Sendable> deserialize(json :String):T
+expect inline fun <reified T> rawDeserialize(json :String):T
+
+
 expect fun sha256(bytes: ByteArray):ByteArray
 
 expect fun String.utfToByteArray():ByteArray
