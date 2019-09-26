@@ -13,6 +13,7 @@ import java.io.PrintWriter
 import java.nio.charset.Charset
 import java.time.Duration
 import java.util.*
+import kotlin.system.exitProcess
 
 
 fun main(args :Array<String>) {
@@ -31,8 +32,7 @@ fun main(args :Array<String>) {
         )
         writer.flush()
         System.out.flush()
-        System.exit(0)
-        null as PassedArguments
+        exitProcess(0)
     }
 
 

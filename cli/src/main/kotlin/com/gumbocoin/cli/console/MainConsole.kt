@@ -8,6 +8,7 @@ import com.gumbocoin.cli.switchy
 import systems.carson.base.*
 import java.time.Duration
 import java.time.Instant
+import kotlin.system.exitProcess
 
 /**
  * This is stuff that has to deal with logging in, logging out, an
@@ -57,6 +58,28 @@ val mainConsole = console {
             println("$id has $money Gumbocoin" + if (money == 1) "" else "s")
         }
 
+    }
+    action {
+        name = "trail"
+        desc = "get list of blocks mined"
+        runner = runner {
+            if(it.threadedMiner == null){
+                println("not running a miner - are you logged in and have started the miner?")
+                return@runner
+            }
+            it.threadedMiner!!.toFlux()
+                .map { (block,status) ->
+                    (if(status.failed) "failed: " else "block: ") + block.hash + " " + block.difficulty
+                }.map { t -> println(t) }
+                .blockLast()
+        }
+    }
+    action {
+        name = "stop"
+        desc = "quits the program"
+        runner = runner {
+            exitProcess(0)
+        }
     }
     action {
         name = "signup"
