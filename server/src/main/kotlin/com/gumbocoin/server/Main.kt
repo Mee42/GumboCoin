@@ -24,6 +24,9 @@ const val blocksToTake = 5
 val blockchain: Blockchain
     get() = BlockchainManager.blockchain
 
+fun limit(diff: Long):Long{
+    return diff.coerceAtMost(100);// because fuck
+}
 val diff: Long
     get() {
         if(inputArguments.devFlags.contains(DevFlags.LOW_DIFF)){
@@ -40,7 +43,7 @@ val diff: Long
         val averageDiffs = lastFiveBLocks.map { it.difficulty }.average().toLong()
         val averageTimeBetweenBlocks:Duration = time.dividedBy(blocksToTake.toLong() - 1)
         val averageTimePerDiff:Duration = averageTimeBetweenBlocks.dividedBy(averageDiffs)
-        return targetTimeBetweenBlocks.toMillis() / averageTimePerDiff.toMillis()
+        return limit(targetTimeBetweenBlocks.toMillis() / averageTimePerDiff.toMillis())
     }
 
 val logger = GLogger.logger()
